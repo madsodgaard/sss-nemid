@@ -1,5 +1,6 @@
 import Foundation
 import Crypto
+import CNemIDBoringSSL
 
 enum NemID {}
 
