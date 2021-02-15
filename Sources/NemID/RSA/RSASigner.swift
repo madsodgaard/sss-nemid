@@ -8,8 +8,12 @@ enum RSASignerError: Error {
     case failedToGetDigest
 }
 
-struct RSASigner {
+public struct RSASigner {
     let privateKey: RSAKey
+    
+    public init(privateKey: RSAKey) {
+        self.privateKey = privateKey
+    }
     
     func sign<Plaintext>(_ plaintext: Plaintext) throws -> [UInt8] where Plaintext: DataProtocol {
         var signatureLength: UInt32 = 0

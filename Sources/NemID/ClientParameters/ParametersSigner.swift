@@ -5,10 +5,14 @@ enum NemIDParameterSigningError: Error {
     case invalidData
 }
 
-struct NemIDParameterSigner {
-    let rsaSigner: RSASigner
+public struct NemIDParametersSigner {
+    private let rsaSigner: RSASigner
     
-    func sign(_ parameters: NemIDUnsignedClientParameters) throws -> NemIDSignedClientParameters {
+    public init(rsaSigner: RSASigner) {
+        self.rsaSigner = rsaSigner
+    }
+    
+    public func sign(_ parameters: NemIDUnsignedClientParameters) throws -> NemIDSignedClientParameters {
         guard let normalizedData = parameters.normalized.data(using: .utf8) else { throw NemIDParameterSigningError.invalidData }
         let digest = SHA256.hash(data: normalizedData)
         let base64ParamsDigest = Data(digest).base64EncodedString()

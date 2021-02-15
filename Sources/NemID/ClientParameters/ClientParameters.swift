@@ -1,16 +1,17 @@
 import Foundation
 
-enum NemIDClientParametersClientFlow: String, Encodable {
+public enum NemIDClientParametersClientFlow: String, Encodable {
     /// 2 factor OCES login
     case ocesLogin2
 }
-enum NemIDClientParametersClientLanguage: String, Encodable {
+
+public enum NemIDClientParametersClientLanguage: String, Encodable {
     case danish = "DA"
     case english = "EN"
     case greenlandic = "KL"
 }
 
-protocol NemIDClientParameters {
+public protocol NemIDClientParameters {
     /// Determines which NemID flow to start
     var clientFlow: NemIDClientParametersClientFlow { get }
     /// Client language

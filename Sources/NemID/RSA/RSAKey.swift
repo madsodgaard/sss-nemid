@@ -1,7 +1,11 @@
 import Foundation
 import CNemIDBoringSSL
 
-final class RSAKey {
+public final class RSAKey {
+    public static func `private`(pem string: String) throws -> RSAKey {
+        try .private(pem: [UInt8](string.utf8))
+    }
+    
     public static func `private`<Data>(pem data: Data) throws -> RSAKey
     where Data: DataProtocol
     {
