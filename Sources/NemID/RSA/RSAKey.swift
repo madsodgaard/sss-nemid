@@ -1,7 +1,24 @@
 import Foundation
-import CNemIDBoringSSL
+@_implementationOnly import CNemIDBoringSSL
 
-public final class RSAKey {
+protocol BIOLoadable { }
+
+extension BIOLoadable {
+    static func load<Data, T>(pem data: Data, _ closure: (UnsafeMutablePointer<BIO>) -> T?) throws -> T
+    where Data: DataProtocol
+    {
+        let bytes = data.copyBytes()
+        let bio = CNemIDBoringSSL_BIO_new_mem_buf(bytes, numericCast(bytes.count))
+        defer { CNemIDBoringSSL_BIO_free(bio) }
+        
+        guard let bioPtr = bio, let result = closure(bioPtr) else {
+            fatalError()
+        }
+        return result
+    }
+}
+
+public final class RSAKey: BIOLoadable {
     public static func `private`(pem string: String) throws -> RSAKey {
         try .private(pem: [UInt8](string.utf8))
     }
@@ -16,26 +33,17 @@ public final class RSAKey {
         return self.init(privateKey)
     }
     
-    private static func load<Data, T>(pem data: Data, _ closure: (UnsafeMutablePointer<BIO>) -> T?) throws -> T
-    where Data: DataProtocol
-    {
-        let bytes = data.copyBytes()
-        let bio = CNemIDBoringSSL_BIO_new_mem_buf(bytes, numericCast(bytes.count))
-        defer { CNemIDBoringSSL_BIO_free(bio) }
-        
-        guard let bioPtr = bio, let result = closure(bioPtr) else {
-            fatalError()
-        }
-        return result
+    var ref: UnsafeMutablePointer<RSA> {
+        _ref.assumingMemoryBound(to: RSA.self)
     }
     
-    let key: UnsafeMutablePointer<RSA>
+    let _ref: UnsafeMutableRawPointer
     
-    init(_ key: UnsafeMutablePointer<RSA>) {
-        self.key = key
+    init(_ ref: UnsafeMutablePointer<RSA>) {
+        self._ref = UnsafeMutableRawPointer(ref)
     }
     
     deinit {
-        CNemIDBoringSSL_RSA_free(key)
+        CNemIDBoringSSL_RSA_free(ref)
     }
 }
