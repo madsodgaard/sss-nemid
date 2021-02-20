@@ -4,14 +4,9 @@ import XCTest
 final class CertificateExtractorTests: XCTestCase {
     func test_extract_extractsChain() throws {
         let sut = CertificatesExtractor()
-        let xml = NemIDXMLDSigResponse(
-            signature: .init(
-                signedInfo: .init(),
-                keyInfo: .init(
-                    x509Data: .init(
-                        x509Certificate: [globalSignCert, googleTrustCert, googleComCer]))))
+        let response = ParsedXMLDSigResponse(signatureValue: "", signedInfo: "", referenceDigestValue: "", objectToBeSigned: "", x509Certificates: [globalSignCert, googleTrustCert, googleComCer])
         
-        let chain = try sut.extract(from: xml)
+        let chain = try sut.extract(from: response)
         try XCTAssertEqual(chain.root, X509Certificate(der: Data(base64Encoded: globalSignCert, options: .ignoreUnknownCharacters)!))
         try XCTAssertEqual(chain.intermediate, X509Certificate(der: Data(base64Encoded: googleTrustCert, options: .ignoreUnknownCharacters)!))
         try XCTAssertEqual(chain.leaf, X509Certificate(der: Data(base64Encoded: googleComCer, options: .ignoreUnknownCharacters)!))

@@ -9,15 +9,15 @@ enum RSASignerError: Error {
 }
 
 public struct RSASigner {
-    let privateKey: RSAKey
+    let key: RSAKey
     
-    public init(privateKey: RSAKey) {
-        self.privateKey = privateKey
+    public init(key: RSAKey) {
+        self.key = key
     }
     
     func sign<Plaintext>(_ plaintext: Plaintext) throws -> [UInt8] where Plaintext: DataProtocol {
         var signatureLength: UInt32 = 0
-        var signature = [UInt8](repeating: 0, count: Int(CNemIDBoringSSL_RSA_size(privateKey.ref)))
+        var signature = [UInt8](repeating: 0, count: Int(CNemIDBoringSSL_RSA_size(key.ref)))
         
         let digest = try self.digest(plaintext)
         guard CNemIDBoringSSL_RSA_sign(
@@ -26,12 +26,30 @@ public struct RSASigner {
             numericCast(digest.count),
             &signature,
             &signatureLength,
-            privateKey.ref
+            key.ref
         ) == 1 else {
             throw RSASignerError.failedToSignDigest
         }
         
         return [UInt8](signature[0..<Int(signatureLength)])
+    }
+    
+    func verify<Signature, Plaintext>(
+        _ signature: Signature,
+        signs plaintext: Plaintext
+    ) throws -> Bool
+        where Signature: DataProtocol, Plaintext: DataProtocol
+    {
+        let digest = try self.digest(plaintext)
+        let signature = signature.copyBytes()
+        return CNemIDBoringSSL_RSA_verify(
+            CNemIDBoringSSL_EVP_MD_type(CNemIDBoringSSL_EVP_sha256()),
+            digest,
+            numericCast(digest.count),
+            signature,
+            numericCast(signature.count),
+            self.key.ref
+        ) == 1
     }
     
     private func digest<Plaintext>(_ plaintext: Plaintext) throws -> [UInt8] where Plaintext: DataProtocol {

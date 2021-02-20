@@ -16,6 +16,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-crypto.git", from: "1.1.3"),
+        .package(url: "https://github.com/yahoojapan/SwiftyXMLParser.git", from: "5.3.0")
     ],
     targets: [
         .target(name: "CNemIDBoringSSL"),
@@ -23,7 +24,8 @@ let package = Package(
             name: "NemID",
             dependencies: [
                 .target(name: "CNemIDBoringSSL"),
-                .product(name: "Crypto", package: "swift-crypto")
+                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "SwiftyXMLParser", package: "SwiftyXMLParser")
             ]),
         .testTarget(
             name: "NemIDTests",
