@@ -1,23 +1,6 @@
 import Foundation
 @_implementationOnly import CNemIDBoringSSL
 
-protocol BIOLoadable { }
-
-extension BIOLoadable {
-    static func load<Data, T>(pem data: Data, _ closure: (UnsafeMutablePointer<BIO>) -> T?) throws -> T
-    where Data: DataProtocol
-    {
-        let bytes = data.copyBytes()
-        let bio = CNemIDBoringSSL_BIO_new_mem_buf(bytes, numericCast(bytes.count))
-        defer { CNemIDBoringSSL_BIO_free(bio) }
-        
-        guard let bioPtr = bio, let result = closure(bioPtr) else {
-            fatalError()
-        }
-        return result
-    }
-}
-
 public final class RSAKey: BIOLoadable {
     public static func `private`(pem string: String) throws -> RSAKey {
         try .private(pem: [UInt8](string.utf8))

@@ -38,10 +38,10 @@ final class X509Certificate: BIOLoadable {
         }
     }
     
-    /// Verifies that `self` was signed with `signer`'s public key.
+    /// Verifies that `self` was signed with `signer`'s private key.
     func isSignedBy(by signer: X509Certificate) throws -> Bool {
         try signer.withPublicKey { pubKey in
-            return CNemIDBoringSSL_X509_verify(self.ref, pubKey) == 1
+            CNemIDBoringSSL_X509_verify(self.ref, pubKey) == 1
         }
     }
     
@@ -145,7 +145,7 @@ final class X509Certificate: BIOLoadable {
         _ref.assumingMemoryBound(to: X509.self)
     }
     
-    let _ref: UnsafeMutableRawPointer
+    private let _ref: UnsafeMutableRawPointer
     
     private init(_ ref: UnsafeMutablePointer<X509>) {
         self._ref = UnsafeMutableRawPointer(ref)

@@ -1,11 +1,5 @@
 import Foundation
 
-struct CertificateChain {
-    let root: X509Certificate
-    let intermediate: X509Certificate
-    let leaf: X509Certificate
-}
-
 enum CertificatesExtractorError: Error {
     case failedToDecodeCertificate
     case unexpectedCertificateCount(Int)

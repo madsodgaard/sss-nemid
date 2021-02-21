@@ -10,7 +10,7 @@ enum NemIDResponseVerifierError: Error {
     case failedToExtractSignatureValue
     case digestDidNotMatchSignedObject
     case signedInfoWasNotSignedByCertificate
-    case certificateWasNotSignedByPublicKey
+    case certificateWasNotSignedByCorrectCertificate
     case failedToExtractCertificateDates
     case certificateIsOutsideValidTime
 }
@@ -21,11 +21,11 @@ struct NemIDResponseVerifier {
     /// Verifies a response from a NemID client flow such as logging in
     ///
     /// Does the checks in respect to the NemID documentation p. 34:
-    /// 1. Extract the certficiates from XMLDSig
-    /// 2. Validate the signature on XMLDSig
-    /// 3. Validate the certificate and identify CA as OCES throughout the chain
-    /// 4. Check that the certificate has not expired
-    /// 5. Check that the certficate has not been revoked
+    /// - Extract the certficiates from XMLDSig
+    /// - Validate the signature on XMLDSig
+    /// - Validate the certificate and identify CA as OCES throughout the chain
+    /// - Check that the certificate has not expired
+    /// - Check that the certficate has not been revoked
     ///
     /// - Parameters:
     ///     - response: The XML as a `String` received from the client.
@@ -39,24 +39,36 @@ struct NemIDResponseVerifier {
         
         // Validate certificate chain
         try validateCertificateChain(certificates)
+        
+        // TODO: Verify that certificate has not been revoked (OCSP)
     }
     
     private func validateCertificateChain(_ chain: CertificateChain) throws {
-        let allCertificates = [chain.root, chain.intermediate, chain.leaf]
+        // TODO: Verify that leaf certificate has digitalSignature key usage
         
-        for certificate in allCertificates {
+        for certificate in chain {
             // Verify certificate times.
-            guard let notAfter = certificate.notAfter(), let notBefore = certificate.notBefore() else { throw NemIDResponseVerifierError.failedToExtractCertificateDates }
+            guard let notAfter = certificate.notAfter(),
+                  let notBefore = certificate.notBefore()
+            else {
+                throw NemIDResponseVerifierError.failedToExtractCertificateDates
+            }
             guard notAfter < Date() && notBefore > Date() else { throw NemIDResponseVerifierError.certificateIsOutsideValidTime }
         }
+        
+        // TODO: Verify that intermediate and root has cA constraint
+        
+        // TODO: Verify that intermediate and root has keyCertSign usage
         
         // Verify the actual chain signing.
         guard try chain.leaf.isSignedBy(by: chain.intermediate),
               try chain.intermediate.isSignedBy(by: chain.root),
               try chain.root.isSignedBy(by: chain.root)
         else {
-            throw NemIDResponseVerifierError.certificateWasNotSignedByPublicKey
+            throw NemIDResponseVerifierError.certificateWasNotSignedByCorrectCertificate
         }
+        
+        // TODO: Verify that root certificate is a trusted OCES certificate.
     }
     
     /// Verifies the signed element in the xml response
