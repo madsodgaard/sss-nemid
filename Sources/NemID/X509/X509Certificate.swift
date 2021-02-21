@@ -6,6 +6,14 @@ enum X509CertificateError: Error {
 }
 
 final class X509Certificate: BIOLoadable {
+    /// Used for formatting the `notBefore`and `notAfter` date formats to Swift `Date`
+    private lazy var dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .init(identifier: "en-US")
+        formatter.dateFormat = "MMM dd HH:mm:SS yyyy ZZZZ"
+        return formatter
+    }()
+    
     /// Initialize a new certificate from a DER-encoded string
     convenience init(der string: String) throws {
         try self.init(der: [UInt8](string.utf8))
@@ -22,12 +30,66 @@ final class X509Certificate: BIOLoadable {
     
     /// Extracts the public key as `RSAKey`
     func publicKey() throws -> RSAKey {
-        let pubKey = CNemIDBoringSSL_X509_get_pubkey(self.ref)
-        defer { CNemIDBoringSSL_EVP_PKEY_free(pubKey) }
-        guard let rsaKey = CNemIDBoringSSL_EVP_PKEY_get1_RSA(pubKey) else {
-            throw X509CertificateError.failedToRetrievePublicKey
+        try withPublicKey { key in
+            guard let rsaKey = CNemIDBoringSSL_EVP_PKEY_get1_RSA(key) else {
+                throw X509CertificateError.failedToRetrievePublicKey
+            }
+            return RSAKey(rsaKey)
         }
-        return RSAKey(rsaKey)
+    }
+    
+    /// Verifies that `self` was signed with `signer`'s public key.
+    func isSignedBy(by signer: X509Certificate) throws -> Bool {
+        try signer.withPublicKey { pubKey in
+            return CNemIDBoringSSL_X509_verify(self.ref, pubKey) == 1
+        }
+    }
+    
+    /// Returns the certificate notBefore as a `Date`
+    func notBefore() -> Date? {
+        guard let asn1Time = CNemIDBoringSSL_X509_get0_notBefore(self.ref) else { return nil }
+        guard let bio = CNemIDBoringSSL_BIO_new(CNemIDBoringSSL_BIO_s_mem()) else { return nil }
+        defer { CNemIDBoringSSL_BIO_free(bio) }
+        
+        guard CNemIDBoringSSL_ASN1_TIME_print(bio, asn1Time) == 1 else { return nil }
+        
+        var _bytesPtr: UnsafeMutablePointer<Int8>?
+        let availableBytes = CNemIDBoringSSL_BIO_get_mem_data(bio, &_bytesPtr)
+        guard let bytesPtr = _bytesPtr else { return nil }
+        let data = Data(buffer: UnsafeBufferPointer(start: bytesPtr, count: availableBytes))
+        
+        guard let utf8String = String(data: data, encoding: .utf8),
+              let date = dateFormatter.date(from: utf8String)
+        else { return nil }
+        
+        return date
+    }
+    
+    /// Returns the certificate notAfter as a `Date`
+    func notAfter() -> Date? {
+        guard let asn1Time = CNemIDBoringSSL_X509_get0_notAfter(self.ref) else { return nil }
+        guard let bio = CNemIDBoringSSL_BIO_new(CNemIDBoringSSL_BIO_s_mem()) else { return nil }
+        defer { CNemIDBoringSSL_BIO_free(bio) }
+        
+        guard CNemIDBoringSSL_ASN1_TIME_print(bio, asn1Time) == 1 else { return nil }
+        
+        var _bytesPtr: UnsafeMutablePointer<Int8>?
+        let availableBytes = CNemIDBoringSSL_BIO_get_mem_data(bio, &_bytesPtr)
+        guard let bytesPtr = _bytesPtr else { return nil }
+        let data = Data(buffer: UnsafeBufferPointer(start: bytesPtr, count: availableBytes))
+        
+        guard let utf8String = String(data: data, encoding: .utf8),
+              let date = dateFormatter.date(from: utf8String)
+        else { return nil }
+        
+        return date
+    }
+    
+    /// Returns a pointer to the public key, which is only valid for the lifetime of the closure
+    func withPublicKey<T>(_ handler: (UnsafeMutablePointer<EVP_PKEY>?) throws -> T) throws -> T {
+        guard let pubKey = CNemIDBoringSSL_X509_get_pubkey(self.ref) else { throw X509CertificateError.failedToRetrievePublicKey }
+        defer { CNemIDBoringSSL_EVP_PKEY_free(pubKey) }
+        return try handler(pubKey)
     }
     
     /// Returns the subject as ASN.1/DER encoded bytes.

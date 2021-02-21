@@ -1,6 +1,7 @@
 import Foundation
 import SwiftyXMLParser
 import Crypto
+@_implementationOnly import CNemIDBoringSSL
 
 enum NemIDResponseVerifierError: Error {
     case failedToExtractSignedInfo
@@ -9,6 +10,9 @@ enum NemIDResponseVerifierError: Error {
     case failedToExtractSignatureValue
     case digestDidNotMatchSignedObject
     case signedInfoWasNotSignedByCertificate
+    case certificateWasNotSignedByPublicKey
+    case failedToExtractCertificateDates
+    case certificateIsOutsideValidTime
 }
 
 struct NemIDResponseVerifier {
@@ -32,6 +36,27 @@ struct NemIDResponseVerifier {
         
         // Validate XML signature with leaf certificate
         try validateXMLSignature(parsedResponse, withCert: certificates.leaf)
+        
+        // Validate certificate chain
+        try validateCertificateChain(certificates)
+    }
+    
+    private func validateCertificateChain(_ chain: CertificateChain) throws {
+        let allCertificates = [chain.root, chain.intermediate, chain.leaf]
+        
+        for certificate in allCertificates {
+            // Verify certificate times.
+            guard let notAfter = certificate.notAfter(), let notBefore = certificate.notBefore() else { throw NemIDResponseVerifierError.failedToExtractCertificateDates }
+            guard notAfter < Date() && notBefore > Date() else { throw NemIDResponseVerifierError.certificateIsOutsideValidTime }
+        }
+        
+        // Verify the actual chain signing.
+        guard try chain.leaf.isSignedBy(by: chain.intermediate),
+              try chain.intermediate.isSignedBy(by: chain.root),
+              try chain.root.isSignedBy(by: chain.root)
+        else {
+            throw NemIDResponseVerifierError.certificateWasNotSignedByPublicKey
+        }
     }
     
     /// Verifies the signed element in the xml response

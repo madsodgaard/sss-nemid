@@ -1,7 +1,7 @@
 import XCTest
 @testable import NemID
 
-final class CertificateExtractorTests: XCTestCase {
+final class CertificateExtractorTests: XCTestCase {    
     func test_extract_extractsChain() throws {
         let sut = CertificatesExtractor()
         let response = ParsedXMLDSigResponse(signatureValue: "", signedInfo: "", referenceDigestValue: "", objectToBeSigned: "", x509Certificates: [globalSignCert, googleTrustCert, googleComCer])
