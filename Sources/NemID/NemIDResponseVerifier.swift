@@ -13,6 +13,9 @@ enum NemIDResponseVerifierError: Error {
     case certificateWasNotSignedByCorrectCertificate
     case failedToExtractCertificateDates
     case certificateIsOutsideValidTime
+    case issuerDidNotHaveCAFlag
+    case leafDidNotHaveDigitalSignatureKeyUsage
+    case issuerDidNotHaveKeyCertSignKeyUsage
 }
 
 struct NemIDResponseVerifier {
@@ -44,10 +47,11 @@ struct NemIDResponseVerifier {
     }
     
     private func validateCertificateChain(_ chain: CertificateChain) throws {
-        // TODO: Verify that leaf certificate has digitalSignature key usage
+        // Verify that leaf certificate has digitalSignature key usage
+        guard chain.leaf.hasKeyUsage(.digitalSignature) else { throw NemIDResponseVerifierError.leafDidNotHaveDigitalSignatureKeyUsage }
         
+        // Verify certificate times.
         for certificate in chain {
-            // Verify certificate times.
             guard let notAfter = certificate.notAfter(),
                   let notBefore = certificate.notBefore()
             else {
@@ -56,9 +60,13 @@ struct NemIDResponseVerifier {
             guard notAfter < Date() && notBefore > Date() else { throw NemIDResponseVerifierError.certificateIsOutsideValidTime }
         }
         
-        // TODO: Verify that intermediate and root has cA constraint
+        #warning("Path len validation???")
         
-        // TODO: Verify that intermediate and root has keyCertSign usage
+        // Verify that intermediate and root has cA constraint
+        guard chain.root.hasCAFlag() && chain.intermediate.hasCAFlag() else { throw NemIDResponseVerifierError.issuerDidNotHaveCAFlag }
+        
+        // Verify that intermediate and root has keyCertSign usage
+        guard chain.intermediate.hasKeyUsage(.keyCertSign) && chain.root.hasKeyUsage(.keyCertSign) else { throw NemIDResponseVerifierError.issuerDidNotHaveKeyCertSignKeyUsage }
         
         // Verify the actual chain signing.
         guard try chain.leaf.isSignedBy(by: chain.intermediate),
@@ -68,7 +76,8 @@ struct NemIDResponseVerifier {
             throw NemIDResponseVerifierError.certificateWasNotSignedByCorrectCertificate
         }
         
-        // TODO: Verify that root certificate is a trusted OCES certificate.
+        // Verify that root certificate is a trusted OCES certificate.
+        #warning("todo")
     }
     
     /// Verifies the signed element in the xml response

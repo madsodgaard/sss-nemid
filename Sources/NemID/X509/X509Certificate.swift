@@ -6,6 +6,20 @@ enum X509CertificateError: Error {
 }
 
 final class X509Certificate: BIOLoadable {
+    enum KeyUsage {
+        case digitalSignature
+        case keyCertSign
+        
+        var value: Int32 {
+            switch self {
+            case .digitalSignature:
+                return KU_DIGITAL_SIGNATURE
+            case .keyCertSign:
+                return KU_KEY_CERT_SIGN
+            }
+        }
+    }
+    
     /// Used for formatting the `notBefore`and `notAfter` date formats to Swift `Date`
     private lazy var dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -83,6 +97,18 @@ final class X509Certificate: BIOLoadable {
         else { return nil }
         
         return date
+    }
+    
+    /// Returns a `Bool` indicating whether this certificate has the "CA" constraint flag set.
+    func hasCAFlag() -> Bool {
+        let flags = CNemIDBoringSSL_X509_get_extension_flags(self.ref)
+        return Int32(flags) & EXFLAG_CA == EXFLAG_CA
+    }
+    
+    /// Check if this certificate has a specific `KeyUsage`
+    func hasKeyUsage(_ usage: KeyUsage) -> Bool {
+        let keyUsage = CNemIDBoringSSL_X509_get_key_usage(self.ref)
+        return Int32(keyUsage) & usage.value == usage.value
     }
     
     /// Returns a pointer to the public key, which is only valid for the lifetime of the closure
