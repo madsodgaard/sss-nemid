@@ -1,5 +1,5 @@
 import Foundation
-import libxml2
+import Clibxml2
 
 extension DataProtocol {
     /// Returns this XML data as C14N data

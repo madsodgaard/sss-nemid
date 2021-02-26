@@ -1,8 +1,6 @@
 import Foundation
 import SwiftyXMLParser
 
-
-
 struct SwiftyXMLDSigParser: XMLDSigParser {
     func parse(_ xml: String) throws -> ParsedXMLDSigResponse {
         let parser = try XML.parse(xml)

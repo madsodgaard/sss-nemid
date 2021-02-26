@@ -20,13 +20,23 @@ let package = Package(
     ],
     targets: [
         .target(name: "CNemIDBoringSSL"),
+        .systemLibrary(
+            name: "Clibxml2",
+            pkgConfig: "libxml-2.0",
+            providers: [
+                .apt(["libxml2"]),
+                .brew(["libxml2"]),
+            ]
+        ),
         .target(
             name: "NemID",
             dependencies: [
                 .target(name: "CNemIDBoringSSL"),
                 .product(name: "Crypto", package: "swift-crypto"),
-                .product(name: "SwiftyXMLParser", package: "SwiftyXMLParser")
-            ]),
+                .product(name: "SwiftyXMLParser", package: "SwiftyXMLParser"),
+                "Clibxml2"
+            ]
+        ),
         .testTarget(
             name: "NemIDTests",
             dependencies: ["NemID"]),
