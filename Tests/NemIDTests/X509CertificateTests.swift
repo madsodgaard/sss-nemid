@@ -44,4 +44,9 @@ final class X509CertificateTests: XCTestCase {
         let certificate = try X509Certificate(der: Data(base64Encoded: TestCertificates.googleLeaf, options: .ignoreUnknownCharacters)!)
         XCTAssertFalse(certificate.hasKeyUsage(.keyCertSign))
     }
+    
+    func test_commonName_withLeaf_returnsCorrectCommonName() throws {
+        let certificate = try X509Certificate(der: Data(base64Encoded: TestCertificates.googleLeaf, options: .ignoreUnknownCharacters)!)
+        XCTAssertEqual(certificate.subjectCommonName, "*.google.com")
+    }
 }

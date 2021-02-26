@@ -6,20 +6,6 @@ enum X509CertificateError: Error {
 }
 
 final class X509Certificate: BIOLoadable {
-    enum KeyUsage {
-        case digitalSignature
-        case keyCertSign
-        
-        var value: Int32 {
-            switch self {
-            case .digitalSignature:
-                return KU_DIGITAL_SIGNATURE
-            case .keyCertSign:
-                return KU_KEY_CERT_SIGN
-            }
-        }
-    }
-    
     /// Used for formatting the `notBefore`and `notAfter` date formats to Swift `Date`
     private lazy var dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -143,29 +129,41 @@ final class X509Certificate: BIOLoadable {
         CNemIDBoringSSL_OPENSSL_free(namePointer)
         return asn1Bytes
     }
-    //
-    //    /// Returns the common name as UTF-8 encoded bytes.
-    //    var commonName: [UInt8]? {
-    //        let _subjectName = CNemIDBoringSSL_X509_get_subject_name(ref)
-    //
-    //        var lastIndex: Int32 = -1
-    //        var nextIndex: Int32 = -1
-    //        repeat {
-    //            lastIndex = nextIndex
-    //            nextIndex = CNemIDBoringSSL_X509_NAME_get_index_by_NID(_subjectName, NID_commonName, lastIndex)
-    //        } while nextIndex >= 0
-    //
-    //        guard lastIndex >= 0 else { return nil }
-    //        guard let nameData = CNemIDBoringSSL_X509_NAME_ENTRY_get_data(CNemIDBoringSSL_X509_NAME_get_entry(_subjectName, nextIndex)) else { return nil }
-    //
-    //        var encodedName: UnsafeMutablePointer<UInt8>? = nil
-    //        let stringLength = CNemIDBoringSSL_ASN1_STRING_to_UTF8(&encodedName, nameData)
-    //
-    //        guard let namePointer = encodedName else { return nil }
-    //        let bytes = [UInt8](UnsafeBufferPointer(start: namePointer, count: Int(stringLength)))
-    //        CNemIDBoringSSL_OPENSSL_free(namePointer)
-    //        return bytes
-    //    }
+    
+    /// Returns the common name as UTF-8 encoded `String`.
+    var subjectCommonName: String? {
+        subjectNameComponentAsUT8(.commonName)
+    }
+    
+    /// Returns the DN serial number as a UTF-8 encoded `String`
+    var subjectSerialNumber: String? {
+        subjectNameComponentAsUT8(.serialNumber)
+    }
+    
+    private func subjectNameComponentAsUT8(_ component: NameComponent) -> String? {
+        let _subjectName = CNemIDBoringSSL_X509_get_subject_name(ref)
+        
+        var lastIndex: CInt = -1
+        var nextIndex: CInt = -1
+        repeat {
+            lastIndex = nextIndex
+            nextIndex = CNemIDBoringSSL_X509_NAME_get_index_by_NID(_subjectName, component.value, lastIndex)
+        } while nextIndex >= 0
+        
+        guard lastIndex >= 0 else { return nil }
+        guard let nameData = CNemIDBoringSSL_X509_NAME_ENTRY_get_data(CNemIDBoringSSL_X509_NAME_get_entry(_subjectName, lastIndex)) else {
+            return nil
+        }
+        
+        var encodedName: UnsafeMutablePointer<UInt8>? = nil
+        let stringLength = CNemIDBoringSSL_ASN1_STRING_to_UTF8(&encodedName, nameData)
+        
+        guard let namePointer = encodedName else { return nil }
+        let bytes = [UInt8](UnsafeBufferPointer(start: namePointer, count: Int(stringLength)))
+        CNemIDBoringSSL_OPENSSL_free(namePointer)
+        return String(data: Data(bytes), encoding: .utf8)
+    }
+
     
     var ref: UnsafeMutablePointer<X509> {
         _ref.assumingMemoryBound(to: X509.self)
@@ -182,8 +180,40 @@ final class X509Certificate: BIOLoadable {
     }
 }
 
+// MARK: Equatable
 extension X509Certificate: Equatable {
     static func ==(_ lhs: X509Certificate, _ rhs: X509Certificate) -> Bool {
         CNemIDBoringSSL_X509_cmp(lhs.ref, rhs.ref) == 0
+    }
+}
+
+// MARK: - KeyUsage
+extension X509Certificate {
+    enum KeyUsage {
+        case digitalSignature
+        case keyCertSign
+        
+        var value: Int32 {
+            switch self {
+            case .digitalSignature:
+                return KU_DIGITAL_SIGNATURE
+            case .keyCertSign:
+                return KU_KEY_CERT_SIGN
+            }
+        }
+    }
+}
+
+// MARK: - NameComponent
+extension X509Certificate {
+    struct NameComponent {
+        let value: Int32
+        
+        init(_ value: Int32) {
+            self.value = value
+        }
+        
+        static let commonName = NameComponent(NID_commonName)
+        static let serialNumber = NameComponent(NID_serialNumber)
     }
 }

@@ -1,15 +1,7 @@
 import Foundation
 import SwiftyXMLParser
 
-protocol XMLDSigParser {
-    func parse(_ xml: String) throws -> ParsedXMLDSigResponse
-}
 
-enum SwiftyXMLDSigParserError: Error {
-    case missingSignatureValue
-    case missingReferenceDigestValue
-    case missingObjectToBeSigned
-}
 
 struct SwiftyXMLDSigParser: XMLDSigParser {
     func parse(_ xml: String) throws -> ParsedXMLDSigResponse {

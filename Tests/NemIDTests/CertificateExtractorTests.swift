@@ -3,7 +3,7 @@ import XCTest
 
 final class CertificateExtractorTests: XCTestCase {
     func test_extract_extractsChain() throws {
-        let sut = CertificatesExtractor()
+        let sut = DefaultCertificateExtractor()
         let response = ParsedXMLDSigResponse(signatureValue: "", signedInfo: "", referenceDigestValue: "", objectToBeSigned: "", x509Certificates: [TestCertificates.googleRoot, TestCertificates.googleIntermediate, TestCertificates.googleLeaf])
         
         let chain = try sut.extract(from: response)
