@@ -12,7 +12,7 @@ extension DataProtocol {
                     defer { xmlFreeDoc(xmlDoc) }
                     
                     var outputBytes: UnsafeMutablePointer<UInt8>?
-                    let outputLength = xmlC14NDocDumpMemory(xmlDoc, nil, numericCast(XML_C14N_1_0.rawValue), nil, 0, &outputBytes)
+                    let outputLength = xmlC14NDocDumpMemory(xmlDoc, nil, numericCast(XML_C14N_1_1.rawValue), nil, 0, &outputBytes)
                     guard let outputStartPointer = outputBytes else { return nil }
                     
                     let c14n = [UInt8](UnsafeBufferPointer(start: outputStartPointer, count: Int(outputLength)))
