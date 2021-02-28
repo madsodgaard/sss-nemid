@@ -19,22 +19,26 @@ let package = Package(
         .package(url: "https://github.com/yahoojapan/SwiftyXMLParser.git", from: "5.3.0")
     ],
     targets: [
+        .target(
+            name: "NemID",
+            dependencies: [
+                "CNemIDSSL",
+                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "SwiftyXMLParser", package: "SwiftyXMLParser"),
+                "Clibxml2"
+            ]
+        ),
         .target(name: "CNemIDBoringSSL"),
+        .target(
+            name: "CNemIDSSL",
+            dependencies: ["CNemIDBoringSSL"]
+        ),
         .systemLibrary(
             name: "Clibxml2",
             pkgConfig: "libxml-2.0",
             providers: [
                 .apt(["libxml2"]),
                 .brew(["libxml2"]),
-            ]
-        ),
-        .target(
-            name: "NemID",
-            dependencies: [
-                .target(name: "CNemIDBoringSSL"),
-                .product(name: "Crypto", package: "swift-crypto"),
-                .product(name: "SwiftyXMLParser", package: "SwiftyXMLParser"),
-                "Clibxml2"
             ]
         ),
         .testTarget(

@@ -18,7 +18,7 @@ struct DefaultNemIDResponseHandler: NemIDResponseHandler {
         let certificates = try certificateExtractor.extract(from: parsedResponse)
         
         // Validate XML signature with leaf certificate
-        try validateXMLSignature(parsedResponse, withCert: certificates.leaf)
+        try validateXMLSignature(parsedResponse, wasSignedBy: certificates.leaf)
         
         // Validate certificate chain
         try validateCertificateChain(certificates)
@@ -64,7 +64,7 @@ struct DefaultNemIDResponseHandler: NemIDResponseHandler {
     }
     
     /// Verifies the signed element in the xml response
-    private func validateXMLSignature(_ response: ParsedXMLDSigResponse, withCert certificate: X509Certificate) throws {
+    private func validateXMLSignature(_ response: ParsedXMLDSigResponse, wasSignedBy certificate: X509Certificate) throws {
         guard let signedInfoC14N = response.signedInfo.data(using: .utf8)?.C14N() else {
             throw NemIDResponseHandlerError.failedToExtractSignedInfo
         }

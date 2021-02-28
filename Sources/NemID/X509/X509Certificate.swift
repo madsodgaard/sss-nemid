@@ -24,7 +24,6 @@ final class X509Certificate: BIOLoadable {
         let x509 = try Self.load(pem: data) { bioPtr in
             return CNemIDBoringSSL_d2i_X509_bio(bioPtr, nil)
         }
-        
         self.init(x509)
     }
     
@@ -163,7 +162,6 @@ final class X509Certificate: BIOLoadable {
         CNemIDBoringSSL_OPENSSL_free(namePointer)
         return String(data: Data(bytes), encoding: .utf8)
     }
-
     
     var ref: UnsafeMutablePointer<X509> {
         _ref.assumingMemoryBound(to: X509.self)
