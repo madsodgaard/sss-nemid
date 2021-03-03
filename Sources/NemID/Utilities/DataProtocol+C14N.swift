@@ -4,21 +4,19 @@ import Clibxml2
 extension DataProtocol {
     /// Returns this XML data as C14N data
     func C14N() -> [UInt8]? {
-        self.copyBytes()
-            .withUnsafeBufferPointer { ptr in
-                ptr.withMemoryRebound(to: Int8.self) { int8Ptr in
-                    guard let xmlDoc = xmlReadMemory(int8Ptr.baseAddress, CInt(ptr.count), "noname.xml", nil, 0)
-                    else { return nil }
-                    defer { xmlFreeDoc(xmlDoc) }
-                    
-                    var outputBytes: UnsafeMutablePointer<UInt8>?
-                    let outputLength = xmlC14NDocDumpMemory(xmlDoc, nil, numericCast(XML_C14N_1_1.rawValue), nil, 0, &outputBytes)
-                    guard let outputStartPointer = outputBytes else { return nil }
-                    
-                    let c14n = [UInt8](UnsafeBufferPointer(start: outputStartPointer, count: Int(outputLength)))
-                    xmlFree(outputStartPointer)
-                    return c14n
-                }
-            }
+        precondition(self.regions.count <= 1, "There is no such thing as data that has discontiguous regions")
+        guard let region = self.regions.first else { return nil }
+        
+        guard let xmlDoc = region.withUnsafeBytes({ bytes -> xmlDocPtr? in
+            let buf = bytes.bindMemory(to: Int8.self)
+            return xmlReadMemory(buf.baseAddress, numericCast(buf.count), "noname.xml", nil, 0)
+        }) else { return nil }
+        
+        var outBytes: UnsafeMutablePointer<UInt8>?
+        let outLen = xmlC14NDocDumpMemory(xmlDoc, nil, numericCast(XML_C14N_1_1.rawValue), nil, 0, &outBytes)
+        guard outBytes != nil, outLen > 0 else { return nil }
+        defer { xmlFree(outBytes) }
+        
+        return .init(UnsafeBufferPointer(start: outBytes, count: numericCast(outLen)))
     }
 }

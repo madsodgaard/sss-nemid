@@ -2,7 +2,7 @@ import Foundation
 
 /// A model that represents a private NemID user (POCES certificate) with their PID and their name.
 public struct NemIDUser {
-    enum NemIDUserError: Error {
+    enum InitializationError: Error {
         case failedToExtractCommonNameFromCertificate
         case failedToExtractPIDFromCertificate
     }
@@ -15,9 +15,9 @@ public struct NemIDUser {
     public let name: String?
     
     init(from certificate: X509Certificate) throws {
-        guard let commonName = certificate.subjectCommonName else { throw NemIDUserError.failedToExtractCommonNameFromCertificate }
+        guard let commonName = certificate.subjectCommonName else { throw InitializationError.failedToExtractCommonNameFromCertificate }
         guard let pid = certificate.subjectSerialNumber?.components(separatedBy: "PID:").last else {
-            throw NemIDUserError.failedToExtractPIDFromCertificate
+            throw InitializationError.failedToExtractPIDFromCertificate
         }
         
         self.init(pid: pid, name: commonName != "Pseudonym" ? commonName : nil)

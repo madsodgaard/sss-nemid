@@ -14,7 +14,7 @@ final class X509Certificate: BIOLoadable {
         return formatter
     }()
     
-    /// Initialize a new certificate from a DER-encoded string
+    /// Initialize a new certificate from a PEM string
     convenience init(der string: String) throws {
         try self.init(der: [UInt8](string.utf8))
     }
@@ -52,16 +52,15 @@ final class X509Certificate: BIOLoadable {
         
         guard CNemIDBoringSSL_ASN1_TIME_print(bio, asn1Time) == 1 else { return nil }
         
-        var _bytesPtr: UnsafeMutablePointer<Int8>?
-        let availableBytes = CNemIDBoringSSL_BIO_get_mem_data(bio, &_bytesPtr)
+        var _bytesPtr: UnsafePointer<UInt8>?
+        var bytesCount = 0
+        CNemIDBoringSSL_BIO_mem_contents(bio, &_bytesPtr, &bytesCount)
         guard let bytesPtr = _bytesPtr else { return nil }
-        let data = Data(buffer: UnsafeBufferPointer(start: bytesPtr, count: availableBytes))
         
-        guard let utf8String = String(data: data, encoding: .utf8),
-              let date = dateFormatter.date(from: utf8String)
+        guard let utf8String = String(bytesNoCopy: UnsafeMutableRawPointer(mutating: bytesPtr), length: bytesCount, encoding: .ascii, freeWhenDone: false)
         else { return nil }
         
-        return date
+        return dateFormatter.date(from: utf8String)
     }
     
     /// Returns the certificate notAfter as a `Date`
@@ -72,16 +71,15 @@ final class X509Certificate: BIOLoadable {
         
         guard CNemIDBoringSSL_ASN1_TIME_print(bio, asn1Time) == 1 else { return nil }
         
-        var _bytesPtr: UnsafeMutablePointer<Int8>?
-        let availableBytes = CNemIDBoringSSL_BIO_get_mem_data(bio, &_bytesPtr)
+        var _bytesPtr: UnsafePointer<UInt8>?
+        var bytesCount = 0
+        CNemIDBoringSSL_BIO_mem_contents(bio, &_bytesPtr, &bytesCount)
         guard let bytesPtr = _bytesPtr else { return nil }
-        let data = Data(buffer: UnsafeBufferPointer(start: bytesPtr, count: availableBytes))
         
-        guard let utf8String = String(data: data, encoding: .utf8),
-              let date = dateFormatter.date(from: utf8String)
+        guard let utf8String = String(bytesNoCopy: UnsafeMutableRawPointer(mutating: bytesPtr), length: bytesCount, encoding: .ascii, freeWhenDone: false)
         else { return nil }
         
-        return date
+        return dateFormatter.date(from: utf8String)
     }
     
     /// Returns a `Bool` indicating whether this certificate has the "CA" constraint flag set.
@@ -158,9 +156,8 @@ final class X509Certificate: BIOLoadable {
         let stringLength = CNemIDBoringSSL_ASN1_STRING_to_UTF8(&encodedName, nameData)
         
         guard let namePointer = encodedName else { return nil }
-        let bytes = [UInt8](UnsafeBufferPointer(start: namePointer, count: Int(stringLength)))
-        CNemIDBoringSSL_OPENSSL_free(namePointer)
-        return String(data: Data(bytes), encoding: .utf8)
+        defer { CNemIDBoringSSL_OPENSSL_free(namePointer) }
+        return String(bytes: UnsafeBufferPointer(start: namePointer, count: numericCast(stringLength)), encoding: .utf8)
     }
     
     var ref: UnsafeMutablePointer<X509> {
