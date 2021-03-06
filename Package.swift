@@ -16,16 +16,18 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-crypto.git", from: "1.1.3"),
-        .package(url: "https://github.com/yahoojapan/SwiftyXMLParser.git", from: "5.3.0")
+        .package(url: "https://github.com/yahoojapan/SwiftyXMLParser.git", from: "5.3.0"),
+        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.0.0"),
     ],
     targets: [
         .target(
             name: "NemID",
             dependencies: [
+                "Clibxml2",
+                "CNemIDBoringSSL",
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "SwiftyXMLParser", package: "SwiftyXMLParser"),
-                "Clibxml2",
-                "CNemIDBoringSSL"
+                .product(name: "AsyncHTTPClient", package: "async-http-client"),
             ]
         ),
         .target(name: "CNemIDBoringSSL"),

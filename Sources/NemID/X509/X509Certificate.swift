@@ -109,7 +109,7 @@ final class X509Certificate: BIOLoadable {
         let length = CNemIDBoringSSL_i2d_X509_NAME(_subjectName, &subjectNameBytes)
         
         guard let subjectNamePointer = subjectNameBytes else { return nil }
-        let asn1Bytes = [UInt8](UnsafeBufferPointer(start: subjectNamePointer, count: Int(length)))
+        let asn1Bytes = [UInt8](UnsafeBufferPointer(start: subjectNamePointer, count: numericCast(length)))
         CNemIDBoringSSL_OPENSSL_free(subjectNamePointer)
         return asn1Bytes
     }
@@ -122,7 +122,7 @@ final class X509Certificate: BIOLoadable {
         let length = CNemIDBoringSSL_i2d_X509_NAME(_name, &nameBytes)
         
         guard let namePointer = nameBytes else { return nil }
-        let asn1Bytes = [UInt8](UnsafeBufferPointer(start: namePointer, count: Int(length)))
+        let asn1Bytes = [UInt8](UnsafeBufferPointer(start: namePointer, count: numericCast(length)))
         CNemIDBoringSSL_OPENSSL_free(namePointer)
         return asn1Bytes
     }
