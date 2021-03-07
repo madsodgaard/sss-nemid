@@ -8,6 +8,7 @@ struct OCSPRequest {
         case failedToGetIssuerSubject
         case failedToGetSerialNumber
         case failedToGenerateRequest
+        case failedToRetrieveOCSPURL
     }
     
     /// The OCSP request ASN1 as DER encoded bytes.
@@ -109,9 +110,18 @@ struct OCSPRequest {
         guard let derPtr = out else { throw OCSPRequestError.failedToGenerateRequest }
         defer { CNemIDBoringSSL_OPENSSL_free(derPtr) }
         
+        // Extract OCSP endpoint from certificate
+        // STACK_OF(OPENSSL_STRING)
+        guard let ocspStringStack = CNemIDBoringSSL_X509_get1_ocsp(certificate.ref) else {
+            throw OCSPRequestError.failedToRetrieveOCSPURL
+        }
+        defer { CNemIDBoringSSL_sk_OPENSSL_STRING_free(ocspStringStack) }
+        guard let ocspString = CNemIDBoringSSL_sk_OPENSSL_STRING_pop(ocspStringStack) else {
+            throw OCSPRequestError.failedToRetrieveOCSPURL
+        }
+        
         // Initialize properties
         self.requestDER = [UInt8](UnsafeBufferPointer(start: derPtr, count: length))
-        #warning("parse endpoint")
-        self.endpoint = ""
+        self.endpoint = String(cString: ocspString)
     }
 }
