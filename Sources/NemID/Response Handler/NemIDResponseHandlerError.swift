@@ -15,4 +15,12 @@ enum NemIDResponseHandlerError: Error {
     case issuerDidNotHaveKeyCertSignKeyUsage
     case failedToGetUserName
     case failedToGetUserPID
+    case ocspRequestWasNotSuccessful
+    case ocspBasicResponseIsNotPresent
+    case ocspCertificateNotFoundInResponse
+    case ocspSignatureWasNotSignedByCertificate
+    case ocspCertificateWasNotSignedByIssuer
+    case ocspCertificateResponseNotPresent
+    case ocspCertificateStatusIsNotGood
+    case ocspCertificateWrongHashAlgorithm
 }

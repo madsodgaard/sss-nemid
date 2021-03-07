@@ -4,7 +4,7 @@ import Crypto
 
 struct OCSPRequest {
     enum OCSPRequestError: Error {
-        case failedToGetPublicKey
+        case failedToGetIssuerPublicKey
         case failedToGetIssuerSubject
         case failedToGetSerialNumber
         case failedToGenerateRequest
@@ -13,7 +13,7 @@ struct OCSPRequest {
     
     /// The OCSP request ASN1 as DER encoded bytes.
     let requestDER: [UInt8]
-    /// The OCSP server endpoint (fetched from issuer)
+    /// The OCSP server endpoint (fetched from leaf)
     let endpoint: String
     
     /// Builds an OCSP request
@@ -22,25 +22,12 @@ struct OCSPRequest {
     ///     - issuer: The `X509Certificate` issuer of `certificate`
     /// - Returns: The OCSP request bytes DER-encoded.
     init(certificate: X509Certificate, issuer: X509Certificate) throws {
-        // Extract public key from issuer
-        // Should not be freed.
-        guard let pubKeyASN1 = CNemIDBoringSSL_X509_get0_pubkey_bitstr(issuer.ref) else {
-            throw OCSPRequestError.failedToGetPublicKey
-        }
-        
-        // No need to copy data
-        let pubKeyData = Data(bytesNoCopy: CNemIDBoringSSL_ASN1_STRING_data(pubKeyASN1), count: numericCast(CNemIDBoringSSL_ASN1_STRING_length(pubKeyASN1)), deallocator: .none)
-        
-        // Extract issuer subject
-        guard let issuerSubject = issuer.subject else { throw OCSPRequestError.failedToGetIssuerSubject }
-        
         // Hash issuer name and public key
-        let issuerSubjectSHA256 = [UInt8](SHA256.hash(data: issuerSubject))
-        let publicKeySHA256 = [UInt8](SHA256.hash(data: pubKeyData))
-        
-        // Get serial number
-        guard let serialNumberASN1 = CNemIDBoringSSL_X509_get0_serialNumber(certificate.ref) else {
-            throw OCSPRequestError.failedToGetSerialNumber
+        guard let issuerSubjectSHA256 = issuer.hashedSubject else {
+            throw OCSPRequestError.failedToGetIssuerSubject
+        }
+        guard let publicKeySHA256 = issuer.hashedPublicKey else {
+            throw OCSPRequestError.failedToGetIssuerPublicKey
         }
         
         // Create OCSPRequest ASN1 sequence
@@ -97,11 +84,9 @@ struct OCSPRequest {
         }
         
         // Set serial number
-        var bn = BIGNUM()
-        CNemIDBoringSSL_BN_init(&bn)
-        CNemIDBoringSSL_ASN1_INTEGER_to_BN(serialNumberASN1, &bn)
-        guard CNemIDBoringSSL_BN_marshal_asn1(&certID, &bn) == 1 else { throw OCSPRequestError.failedToGenerateRequest }
-        CNemIDBoringSSL_BN_clear(&bn)
+        try certificate.withSerialNumber { serialNumber in
+            guard CNemIDBoringSSL_BN_marshal_asn1(&certID, serialNumber) == 1 else { throw OCSPRequestError.failedToGenerateRequest }
+        }
         
         // Get OCSP request as DER-encoded data.
         var out: UnsafeMutablePointer<UInt8>?

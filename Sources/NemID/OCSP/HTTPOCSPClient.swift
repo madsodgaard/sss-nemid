@@ -37,8 +37,7 @@ struct HTTPOCSPClient: OCSPClient {
                 }
                 
                 guard let body = response.body else { throw HTTPOCSPClientError.responseBodyWasEmpty }
-                #warning("memory copy")
-                return try OCSPResponse(from: [UInt8](body.readableBytesView))
+                return try OCSPResponse(from: [UInt8](buffer: body))
             }
         } catch {
             return eventLoop.makeFailedFuture(error)

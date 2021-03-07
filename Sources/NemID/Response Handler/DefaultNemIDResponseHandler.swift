@@ -1,37 +1,110 @@
 import Foundation
 import SwiftyXMLParser
 import Crypto
+import NIO
 @_implementationOnly import CNemIDBoringSSL
 
+#warning("if something fails it might be releated to this:")
+/*
+ //remember to skip the first byte it is the number of unused bits and it is always 0 for keys and certificates from nodes-php
+ */
 struct DefaultNemIDResponseHandler: NemIDResponseHandler {
     private let xmlParser: XMLDSigParser
     private let certificateExtractor: CertificateExtrator
+    private let ocspClient: OCSPClient
+    private let eventLoop: EventLoop
     
-    public init(xmlParser: XMLDSigParser, certificateExtractor: CertificateExtrator) {
+    public init(xmlParser: XMLDSigParser, certificateExtractor: CertificateExtrator, ocspClient: OCSPClient, eventLoop: EventLoop) {
         self.xmlParser = xmlParser
         self.certificateExtractor = certificateExtractor
+        self.ocspClient = ocspClient
+        self.eventLoop = eventLoop
     }
     
-    func verifyAndExtractUser(from response: String) throws -> NemIDUser {
-        let parsedResponse = try xmlParser.parse(response)
-        // Extract certificate chain.
-        let certificates = try certificateExtractor.extract(from: parsedResponse)
+    func verifyAndExtractUser(from response: String) -> EventLoopFuture<NemIDUser> {
+        do {
+            let parsedResponse = try xmlParser.parse(response)
+            // Extract certificate chain.
+            let certificates = try certificateExtractor.extract(from: parsedResponse)
+            
+            // Validate XML signature with leaf certificate
+            try validateXMLSignature(parsedResponse, wasSignedBy: certificates.leaf)
+            
+            // Validate certificate chain
+            try validateCertificateChain(certificates)
+            
+            // Verify that certificate has not been revoked (OCSP)
+            let ocspRequest = try OCSPRequest(certificate: certificates.leaf, issuer: certificates.intermediate)
+            return ocspClient
+                .send(request: ocspRequest)
+                .flatMapThrowing { response in
+                    try validateOCSPResponse(response, chain: certificates)
+                    return try NemIDUser(from: certificates.leaf)
+                }
+        } catch {
+            return eventLoop.makeFailedFuture(error)
+        }
+    }
+    
+    private func validateOCSPResponse(_ response: OCSPResponse, chain: CertificateChain) throws {
+        // Check response status
+        guard response.responseStatus == .successful else {
+            throw NemIDResponseHandlerError.ocspRequestWasNotSuccessful
+        }
+        guard let basicResponse = response.basicOCSPResponse else {
+            throw NemIDResponseHandlerError.ocspBasicResponseIsNotPresent
+        }
         
-        // Validate XML signature with leaf certificate
-        try validateXMLSignature(parsedResponse, wasSignedBy: certificates.leaf)
+        // Validate that signature is tbsResponseData signed by accompanying certificate
+        guard let ocspCertificate = basicResponse.certs.first else {
+            throw NemIDResponseHandlerError.ocspCertificateNotFoundInResponse
+        }
+        let signer = RSASigner(key: try ocspCertificate.publicKey())
+        guard try signer.verify(basicResponse.signature, signs: basicResponse.tbsResponseData.derBytes) else {
+            throw NemIDResponseHandlerError.ocspSignatureWasNotSignedByCertificate
+        }
         
-        // Validate certificate chain
-        try validateCertificateChain(certificates)
+        // Validate that accompanying certificate was signed by issuer.
+        guard try ocspCertificate.isSignedBy(by: chain.intermediate) else {
+            throw NemIDResponseHandlerError.ocspCertificateWasNotSignedByIssuer
+        }
         
-        // TODO: Verify that certificate has not been revoked (OCSP)
-        #warning("todo")
+        // Validate certificate recovation status
+        guard let certResponse = basicResponse.tbsResponseData.responses.first else {
+            throw NemIDResponseHandlerError.ocspCertificateResponseNotPresent
+        }
+        guard certResponse.certStatus == .good else {
+            throw NemIDResponseHandlerError.ocspCertificateStatusIsNotGood
+        }
         
-        return try NemIDUser(from: certificates.leaf)
+        // Check hash algorithm
+        guard certResponse.certID.hashAlgorithm == .sha256 else {
+            throw NemIDResponseHandlerError.ocspCertificateWrongHashAlgorithm
+        }
+        
+        // Check hash name, key hash and serial number are the ones we sent in the request.
+        try chain.leaf.withSerialNumber { serialNumber in
+            var ptr: UnsafeMutablePointer<UInt8>?
+            ptr = nil
+            let leafSerialNumberSize = CNemIDBoringSSL_BN_bn2bin(serialNumber, ptr)
+            let leafSerialNumberBytes = [UInt8](UnsafeMutableBufferPointer(start: ptr, count: leafSerialNumberSize))
+            guard certResponse.certID.serialNumber == leafSerialNumberBytes else { fatalError() }
+        }
+        guard chain.intermediate.hashedPublicKey == certResponse.certID.issuerKeyHash else { fatalError() }
+        guard chain.intermediate.hashedSubject == certResponse.certID.issuerNameHash else { fatalError() }
+        
+        // Check OCSP revocation dates
+        
+        // Check OCSP signing key usage
+        
+        // Check OCSP extension
     }
     
     private func validateCertificateChain(_ chain: CertificateChain) throws {
         // Verify that leaf certificate has digitalSignature key usage
-        guard chain.leaf.hasKeyUsage(.digitalSignature) else { throw NemIDResponseHandlerError.leafDidNotHaveDigitalSignatureKeyUsage }
+        guard chain.leaf.hasKeyUsage(.digitalSignature) else {
+            throw NemIDResponseHandlerError.leafDidNotHaveDigitalSignatureKeyUsage
+        }
         
         // Verify certificate times.
         for certificate in chain {
@@ -40,16 +113,22 @@ struct DefaultNemIDResponseHandler: NemIDResponseHandler {
             else {
                 throw NemIDResponseHandlerError.failedToExtractCertificateDates
             }
-            guard notAfter < Date() && notBefore > Date() else { throw NemIDResponseHandlerError.certificateIsOutsideValidTime }
+            guard notAfter < Date() && notBefore > Date() else {
+                throw NemIDResponseHandlerError.certificateIsOutsideValidTime
+            }
         }
         
         #warning("Path len validation???")
         
         // Verify that intermediate and root has cA constraint
-        guard chain.root.hasCAFlag() && chain.intermediate.hasCAFlag() else { throw NemIDResponseHandlerError.issuerDidNotHaveCAFlag }
+        guard chain.root.hasCAFlag() && chain.intermediate.hasCAFlag() else {
+            throw NemIDResponseHandlerError.issuerDidNotHaveCAFlag
+        }
         
         // Verify that intermediate and root has keyCertSign usage
-        guard chain.intermediate.hasKeyUsage(.keyCertSign) && chain.root.hasKeyUsage(.keyCertSign) else { throw NemIDResponseHandlerError.issuerDidNotHaveKeyCertSignKeyUsage }
+        guard chain.intermediate.hasKeyUsage(.keyCertSign) && chain.root.hasKeyUsage(.keyCertSign) else {
+            throw NemIDResponseHandlerError.issuerDidNotHaveKeyCertSignKeyUsage
+        }
         
         // Verify the actual chain signing.
         guard try chain.leaf.isSignedBy(by: chain.intermediate),
@@ -79,10 +158,14 @@ struct DefaultNemIDResponseHandler: NemIDResponseHandler {
         }
         
         // Verify reference object digest was made from ToBeSigned object.
-        guard SHA256.hash(data: objectToBeSignedC14N) == referenceDigestBase64Decoded else { throw NemIDResponseHandlerError.digestDidNotMatchSignedObject }
+        guard SHA256.hash(data: objectToBeSignedC14N) == referenceDigestBase64Decoded else {
+            throw NemIDResponseHandlerError.digestDidNotMatchSignedObject
+        }
         
         // Verify that signedInfo was signed with certificate
         let signer = RSASigner(key: try certificate.publicKey())
-        guard try signer.verify(signatureValueBase64Decoded, signs: signedInfoC14N) else { throw NemIDResponseHandlerError.signedInfoWasNotSignedByCertificate }
+        guard try signer.verify(signatureValueBase64Decoded, signs: signedInfoC14N) else {
+            throw NemIDResponseHandlerError.signedInfoWasNotSignedByCertificate
+        }
     }
 }

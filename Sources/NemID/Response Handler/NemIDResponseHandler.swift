@@ -1,4 +1,5 @@
 import Foundation
+import NIO
 
 protocol NemIDResponseHandler {
     /// Verifies a response from a NemID client flow such as logging in and extratcs the user as `NemIDUser`
@@ -12,6 +13,6 @@ protocol NemIDResponseHandler {
     ///
     /// - Parameters:
     ///     - response: The XML as a `String` received from the client.
-    /// - Returns: A `NemIDUser` as the verified certificate user.
-    func verifyAndExtractUser(from response: String) throws -> NemIDUser
+    /// - Returns: A `EventLoopFuture` containg the verified certificate user as `NemIDUser`.
+    func verifyAndExtractUser(from response: String) -> EventLoopFuture<NemIDUser>
 }

@@ -1,8 +1,10 @@
 import Foundation
+import Crypto
 @_implementationOnly import CNemIDBoringSSL
 
 enum X509CertificateError: Error {
     case failedToRetrievePublicKey
+    case failedToGetSerialNumber
 }
 
 final class X509Certificate: BIOLoadable {
@@ -76,8 +78,9 @@ final class X509Certificate: BIOLoadable {
         CNemIDBoringSSL_BIO_mem_contents(bio, &_bytesPtr, &bytesCount)
         guard let bytesPtr = _bytesPtr else { return nil }
         
-        guard let utf8String = String(bytesNoCopy: UnsafeMutableRawPointer(mutating: bytesPtr), length: bytesCount, encoding: .ascii, freeWhenDone: false)
-        else { return nil }
+        guard let utf8String = String(bytesNoCopy: UnsafeMutableRawPointer(mutating: bytesPtr), length: bytesCount, encoding: .ascii, freeWhenDone: false) else {
+            return nil
+        }
         
         return dateFormatter.date(from: utf8String)
     }
@@ -135,6 +138,36 @@ final class X509Certificate: BIOLoadable {
     /// Returns the DN serial number as a UTF-8 encoded `String`
     var subjectSerialNumber: String? {
         subjectNameComponentAsUT8(.serialNumber)
+    }
+    
+    /// Allows access to the certificate's serial number as `BIGNUM`
+    func withSerialNumber(_ closure: (UnsafeMutablePointer<BIGNUM>) throws -> Void) throws {
+        guard let serialNumberASN1 = CNemIDBoringSSL_X509_get0_serialNumber(self.ref) else {
+            throw X509CertificateError.failedToGetSerialNumber
+        }
+        var bn = BIGNUM()
+        CNemIDBoringSSL_BN_init(&bn)
+        CNemIDBoringSSL_ASN1_INTEGER_to_BN(serialNumberASN1, &bn)
+        try closure(&bn)
+        CNemIDBoringSSL_BN_clear(&bn)
+    }
+    
+    /// Returns the certificate's public key as SHA256 encoded DER bytes.
+    var hashedPublicKey: [UInt8]? {
+        guard let pubKeyASN1 = CNemIDBoringSSL_X509_get0_pubkey_bitstr(self.ref) else {
+            return nil
+        }
+        
+        // No need to copy data
+        let pubKeyData = Data(bytesNoCopy: CNemIDBoringSSL_ASN1_STRING_data(pubKeyASN1), count: numericCast(CNemIDBoringSSL_ASN1_STRING_length(pubKeyASN1)), deallocator: .none)
+        
+        return [UInt8](SHA256.hash(data: pubKeyData))
+    }
+    
+    /// Returns the certificate's subject as SHA256 encoded DER bytes
+    var hashedSubject: [UInt8]? {
+        guard let issuerSubject = self.subject else { return nil }
+        return [UInt8](SHA256.hash(data: issuerSubject))
     }
     
     private func subjectNameComponentAsUT8(_ component: NameComponent) -> String? {

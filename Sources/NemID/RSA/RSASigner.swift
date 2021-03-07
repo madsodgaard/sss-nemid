@@ -17,7 +17,7 @@ public struct RSASigner {
     
     func sign<Plaintext>(_ plaintext: Plaintext) throws -> [UInt8] where Plaintext: DataProtocol {
         var signatureLength: UInt32 = 0
-        var signature = [UInt8](repeating: 0, count: Int(CNemIDBoringSSL_RSA_size(key.ref)))
+        var signature = [UInt8](repeating: 0, count: numericCast(CNemIDBoringSSL_RSA_size(key.ref)))
         
         let digest = try self.digest(plaintext)
         guard CNemIDBoringSSL_RSA_sign(

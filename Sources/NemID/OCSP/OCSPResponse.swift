@@ -117,6 +117,7 @@ extension OCSPResponse {
         let signatureAlgorithm: SignatureAlgorithm
         /// The signature as DER encoded bytes.
         let signature: [UInt8]
+        let certs: [X509Certificate]
         
         init(cbs: UnsafeMutablePointer<CBS>) throws {
             // Parse tbsResponseData
@@ -172,6 +173,7 @@ extension OCSPResponse {
             self.tbsResponseData = try ResponseData(cbs: &tbsResponseDataCBS)
             self.signatureAlgorithm = algorithm
             self.signature = signature
+            self.certs = []
         }
     }
 }
@@ -352,6 +354,7 @@ extension OCSPResponse.BasicOCSPResponse.ResponseData.SingleResponse {
             guard CNemIDBoringSSL_CBS_get_asn1(cbs, &serialNumberCBS, CBS_ASN1_INTEGER) == 1 else {
                 throw OCSPResponseError.failedToParseResponse
             }
+            
             var _serialNumberPtr: UnsafeMutablePointer<UInt8>?
             var serialNumberLength = 0
             guard CNemIDBoringSSL_CBS_stow(&serialNumberCBS, &_serialNumberPtr, &serialNumberLength) == 1 else {
