@@ -263,10 +263,21 @@ extension OCSPResponse.BasicOCSPResponse.ResponseData {
             let tagValue = tag ^ CBS_ASN1_CONTEXT_SPECIFIC
             guard let certStatus = CertStatus(asn1Value: tagValue) else { throw OCSPResponseError.unknownCertStatus(tagValue) }
             
-            #warning("convert to dates...")
             // Parse thisUpdate
             var thisUpdateCBS = CBS()
             guard CNemIDBoringSSL_CBS_get_asn1(cbs, &thisUpdateCBS, CBS_ASN1_GENERALIZEDTIME) == 1 else {
+                throw OCSPResponseError.failedToParseResponse
+            }
+            var _thisUpdateBytes: UnsafeMutablePointer<UInt8>?
+            var thisUpdateLength = 0
+            guard CNemIDBoringSSL_CBS_stow(&thisUpdateCBS, &_thisUpdateBytes, &thisUpdateLength) == 1 else {
+                throw OCSPResponseError.failedToParseResponse
+            }
+            guard let thisUpdateBytes = _thisUpdateBytes else { throw OCSPResponseError.failedToParseResponse }
+            defer { CNemIDBoringSSL_OPENSSL_free(thisUpdateBytes) }
+            guard let thisUpdateString = String(bytesNoCopy: thisUpdateBytes, length: thisUpdateLength, encoding: .ascii, freeWhenDone: false),
+                  let thisUpdateDate = GeneralizedTimeFormatter.toDate(thisUpdateString)
+            else {
                 throw OCSPResponseError.failedToParseResponse
             }
             
@@ -286,11 +297,23 @@ extension OCSPResponse.BasicOCSPResponse.ResponseData {
             guard CNemIDBoringSSL_CBS_get_asn1(&nextUpdateCBS, &nextUpdateDateCBS, CBS_ASN1_GENERALIZEDTIME) == 1 else {
                 throw OCSPResponseError.failedToParseResponse
             }
+            var _nextUpdateBytes: UnsafeMutablePointer<UInt8>?
+            var nextUpdateLength = 0
+            guard CNemIDBoringSSL_CBS_stow(&nextUpdateDateCBS, &_nextUpdateBytes, &nextUpdateLength) == 1 else {
+                throw OCSPResponseError.failedToParseResponse
+            }
+            guard let nextUpdateBytes = _nextUpdateBytes else { throw OCSPResponseError.failedToParseResponse }
+            defer { CNemIDBoringSSL_OPENSSL_free(nextUpdateBytes) }
+            guard let nextUpdateString = String(bytesNoCopy: nextUpdateBytes, length: nextUpdateLength, encoding: .ascii, freeWhenDone: false),
+                  let nextUpdateDate = GeneralizedTimeFormatter.toDate(nextUpdateString)
+            else {
+                throw OCSPResponseError.failedToParseResponse
+            }
             
             self.certID = try CertID(cbs: &certIDCBS)
             self.certStatus = certStatus
-            self.nextUpdate = Date()
-            self.thisUpdate = Date()
+            self.thisUpdate = thisUpdateDate
+            self.nextUpdate = nextUpdateDate
         }
     }
 }

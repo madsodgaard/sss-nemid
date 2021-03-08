@@ -8,14 +8,6 @@ enum X509CertificateError: Error {
 }
 
 final class X509Certificate: BIOLoadable {
-    /// Used for formatting the `notBefore`and `notAfter` date formats to Swift `Date`
-    private lazy var dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = .init(identifier: "en-US")
-        formatter.dateFormat = "MMM dd HH:mm:SS yyyy ZZZZ"
-        return formatter
-    }()
-    
     /// Initialize a new certificate from a PEM string
     convenience init(der string: String) throws {
         try self.init(der: [UInt8](string.utf8))
@@ -49,40 +41,45 @@ final class X509Certificate: BIOLoadable {
     /// Returns the certificate notBefore as a `Date`
     func notBefore() -> Date? {
         guard let asn1Time = CNemIDBoringSSL_X509_get0_notBefore(self.ref) else { return nil }
-        guard let bio = CNemIDBoringSSL_BIO_new(CNemIDBoringSSL_BIO_s_mem()) else { return nil }
-        defer { CNemIDBoringSSL_BIO_free(bio) }
         
-        guard CNemIDBoringSSL_ASN1_TIME_print(bio, asn1Time) == 1 else { return nil }
+        var _generalizedTimePtr: UnsafeMutablePointer<ASN1_GENERALIZEDTIME>?
+        CNemIDBoringSSL_ASN1_TIME_to_generalizedtime(asn1Time, &_generalizedTimePtr)
+        guard let generalizedTimePtr = _generalizedTimePtr else { return nil }
+        defer { CNemIDBoringSSL_ASN1_GENERALIZEDTIME_free(generalizedTimePtr) }
         
-        var _bytesPtr: UnsafePointer<UInt8>?
-        var bytesCount = 0
-        CNemIDBoringSSL_BIO_mem_contents(bio, &_bytesPtr, &bytesCount)
-        guard let bytesPtr = _bytesPtr else { return nil }
+        guard let generalizedTimeString = String(
+                bytesNoCopy: UnsafeMutableRawPointer(mutating: generalizedTimePtr.pointee.data),
+                length: numericCast(generalizedTimePtr.pointee.length),
+                encoding: .ascii,
+                freeWhenDone: false
+        )
+        else {
+            return nil
+        }
         
-        guard let utf8String = String(bytesNoCopy: UnsafeMutableRawPointer(mutating: bytesPtr), length: bytesCount, encoding: .ascii, freeWhenDone: false)
-        else { return nil }
-        
-        return dateFormatter.date(from: utf8String)
+        return GeneralizedTimeFormatter.toDate(generalizedTimeString)
     }
     
     /// Returns the certificate notAfter as a `Date`
     func notAfter() -> Date? {
         guard let asn1Time = CNemIDBoringSSL_X509_get0_notAfter(self.ref) else { return nil }
-        guard let bio = CNemIDBoringSSL_BIO_new(CNemIDBoringSSL_BIO_s_mem()) else { return nil }
-        defer { CNemIDBoringSSL_BIO_free(bio) }
         
-        guard CNemIDBoringSSL_ASN1_TIME_print(bio, asn1Time) == 1 else { return nil }
+        var _generalizedTimePtr: UnsafeMutablePointer<ASN1_GENERALIZEDTIME>?
+        CNemIDBoringSSL_ASN1_TIME_to_generalizedtime(asn1Time, &_generalizedTimePtr)
+        guard let generalizedTimePtr = _generalizedTimePtr else { return nil }
+        defer { CNemIDBoringSSL_ASN1_GENERALIZEDTIME_free(generalizedTimePtr) }
         
-        var _bytesPtr: UnsafePointer<UInt8>?
-        var bytesCount = 0
-        CNemIDBoringSSL_BIO_mem_contents(bio, &_bytesPtr, &bytesCount)
-        guard let bytesPtr = _bytesPtr else { return nil }
-        
-        guard let utf8String = String(bytesNoCopy: UnsafeMutableRawPointer(mutating: bytesPtr), length: bytesCount, encoding: .ascii, freeWhenDone: false) else {
+        guard let generalizedTimeString = String(
+            bytesNoCopy: UnsafeMutableRawPointer(mutating: generalizedTimePtr.pointee.data),
+            length: numericCast(generalizedTimePtr.pointee.length),
+            encoding: .ascii,
+            freeWhenDone: false
+        )
+        else {
             return nil
         }
         
-        return dateFormatter.date(from: utf8String)
+        return GeneralizedTimeFormatter.toDate(generalizedTimeString)
     }
     
     /// Returns a `Bool` indicating whether this certificate has the "CA" constraint flag set.

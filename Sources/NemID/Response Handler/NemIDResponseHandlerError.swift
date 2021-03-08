@@ -23,4 +23,5 @@ enum NemIDResponseHandlerError: Error {
     case ocspCertificateResponseNotPresent
     case ocspCertificateStatusIsNotGood
     case ocspCertificateWrongHashAlgorithm
+    case ocspResponseIsOutsideAllowedTime
 }

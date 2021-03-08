@@ -94,6 +94,9 @@ struct DefaultNemIDResponseHandler: NemIDResponseHandler {
         guard chain.intermediate.hashedSubject == certResponse.certID.issuerNameHash else { fatalError() }
         
         // Check OCSP revocation dates
+        guard certResponse.nextUpdate >= Date() && certResponse.thisUpdate <= Date() else {
+            throw NemIDResponseHandlerError.ocspResponseIsOutsideAllowedTime
+        }
         
         // Check OCSP signing key usage
         
