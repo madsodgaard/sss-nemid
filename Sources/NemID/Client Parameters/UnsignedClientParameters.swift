@@ -9,7 +9,15 @@ public struct NemIDUnsignedClientParameters: NemIDClientParameters {
     public let SPCert: String
     public let timestamp: Date
     
-    public init(clientFlow: NemIDClientParametersClientFlow, language: NemIDClientParametersClientLanguage, origin: URL?, rememberUserID: String?, rememberUserIDInitialStatus: Bool?, SPCert: String, timestamp: Date) {
+    public init(
+        clientFlow: NemIDClientParametersClientFlow,
+        language: NemIDClientParametersClientLanguage,
+        origin: URL?,
+        rememberUserID: String?,
+        rememberUserIDInitialStatus: Bool?,
+        SPCert: String,
+        timestamp: Date
+    ) {
         self.clientFlow = clientFlow
         self.language = language
         self.origin = origin

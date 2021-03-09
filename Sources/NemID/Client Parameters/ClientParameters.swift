@@ -46,9 +46,15 @@ extension NemIDClientParameters {
             "TIMESTAMP": String(self.timestamp.timeIntervalSince1970 * 1000)
         ]
         
-        if let origin = self.origin?.absoluteString { parameters["ORIGIN"] = origin }
-        if let rememberUserID = self.rememberUserID { parameters["REMEMBER_USERID"] = rememberUserID }
-        if let rememberUserIDInitialStatus = self.rememberUserIDInitialStatus { parameters["REMEMBER_USERID_INITIAL_STATUS"] = rememberUserIDInitialStatus ? "TRUE": "FALSE" }
+        if let origin = self.origin?.absoluteString {
+            parameters["ORIGIN"] = origin
+        }
+        if let rememberUserID = self.rememberUserID {
+            parameters["REMEMBER_USERID"] = rememberUserID
+        }
+        if let rememberUserIDInitialStatus = self.rememberUserIDInitialStatus {
+            parameters["REMEMBER_USERID_INITIAL_STATUS"] = rememberUserIDInitialStatus ? "TRUE": "FALSE"
+        }
         
         let sortedAlphabeticallyByKeys = parameters.sorted(by: { $0.key.lowercased() < $1.key.lowercased()} )
         return sortedAlphabeticallyByKeys

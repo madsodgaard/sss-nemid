@@ -28,7 +28,8 @@ public struct NemIDParametersSigner {
             SPCert: parameters.SPCert,
             timestamp: parameters.timestamp,
             digestSignature: base64SignedDigest,
-            paramsDigest: base64ParamsDigest)
+            paramsDigest: base64ParamsDigest
+        )
     }
 }
 
