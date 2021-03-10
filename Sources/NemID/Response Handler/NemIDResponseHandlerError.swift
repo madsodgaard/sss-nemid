@@ -13,8 +13,6 @@ enum NemIDResponseHandlerError: Error {
     case issuerDidNotHaveCAFlag
     case leafDidNotHaveDigitalSignatureKeyUsage
     case issuerDidNotHaveKeyCertSignKeyUsage
-    case failedToGetUserName
-    case failedToGetUserPID
     case ocspRequestWasNotSuccessful
     case ocspBasicResponseIsNotPresent
     case ocspCertificateNotFoundInResponse

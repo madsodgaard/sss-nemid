@@ -15,7 +15,7 @@ public struct RSASigner {
         self.key = key
     }
     
-    func sign<Plaintext>(_ plaintext: Plaintext) throws -> [UInt8] where Plaintext: DataProtocol {
+    func sign(_ plaintext: [UInt8]) throws -> [UInt8] {
         var signatureLength: UInt32 = 0
         var signature = [UInt8](repeating: 0, count: numericCast(CNemIDBoringSSL_RSA_size(key.ref)))
         
@@ -34,14 +34,8 @@ public struct RSASigner {
         return [UInt8](signature[0..<Int(signatureLength)])
     }
     
-    func verify<Signature, Plaintext>(
-        _ signature: Signature,
-        signs plaintext: Plaintext
-    ) throws -> Bool
-        where Signature: DataProtocol, Plaintext: DataProtocol
-    {
+    func verify(_ signature: [UInt8], signs plaintext: [UInt8]) throws -> Bool {
         let digest = try self.digest(plaintext)
-        let signature = signature.copyBytes()
         return CNemIDBoringSSL_RSA_verify(
             CNemIDBoringSSL_EVP_MD_type(CNemIDBoringSSL_EVP_sha256()),
             digest,
@@ -52,7 +46,7 @@ public struct RSASigner {
         ) == 1
     }
     
-    private func digest<Plaintext>(_ plaintext: Plaintext) throws -> [UInt8] where Plaintext: DataProtocol {
+    private func digest(_ plaintext: [UInt8]) throws -> [UInt8] {
         let context = CNemIDBoringSSL_EVP_MD_CTX_new()
         defer { CNemIDBoringSSL_EVP_MD_CTX_free(context) }
         
@@ -60,8 +54,7 @@ public struct RSASigner {
             throw RSASignerError.failedToInitializeDigest
         }
         
-        let bytes = plaintext.copyBytes()
-        guard CNemIDBoringSSL_EVP_DigestUpdate(context, bytes, numericCast(bytes.count)) == 1 else {
+        guard CNemIDBoringSSL_EVP_DigestUpdate(context, plaintext, numericCast(plaintext.count)) == 1 else {
             throw RSASignerError.failedToUpdateDigest
         }
         

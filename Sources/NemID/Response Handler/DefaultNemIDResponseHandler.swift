@@ -167,7 +167,7 @@ struct DefaultNemIDResponseHandler: NemIDResponseHandler {
         
         // Verify that signedInfo was signed with certificate
         let signer = RSASigner(key: try certificate.publicKey())
-        guard try signer.verify(signatureValueBase64Decoded, signs: signedInfoC14N) else {
+        guard try signer.verify([UInt8](signatureValueBase64Decoded), signs: signedInfoC14N) else {
             throw NemIDResponseHandlerError.signedInfoWasNotSignedByCertificate
         }
     }

@@ -7,7 +7,7 @@ public final class RSAKey: BIOLoadable {
     }
     
     public static func `private`<Data>(pem data: Data) throws -> RSAKey
-    where Data: DataProtocol
+        where Data: DataProtocol
     {
         let privateKey = try self.load(pem: data, { bio in
             CNemIDBoringSSL_PEM_read_bio_RSAPrivateKey(bio, nil, nil, nil)

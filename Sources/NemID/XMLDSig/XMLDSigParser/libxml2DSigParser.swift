@@ -93,6 +93,7 @@ struct libxml2XMLDSigParser: XMLDSigParser {
         )
     }
     
+    /// Parses a XPath query and returns the first element as XML data.
     private func parseFirstXPathElementAsXML(query: String, context: xmlXPathContextPtr, in xmlDoc: xmlDocPtr) -> Data? {
         guard let xPathObject = xmlXPathEvalExpression(#"/openoces:signature/ds:Signature/ds:Object[@Id="ToBeSigned"]"#, context) else {
             return nil
