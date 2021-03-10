@@ -21,9 +21,9 @@ struct DefaultNemIDResponseHandler: NemIDResponseHandler {
         self.eventLoop = eventLoop
     }
     
-    func verifyAndExtractUser(from response: String) -> EventLoopFuture<NemIDUser> {
+    func verifyAndExtractUser(fromXML xmlData: [UInt8]) -> EventLoopFuture<NemIDUser> {
         do {
-            let parsedResponse = try xmlParser.parse(response)
+            let parsedResponse = try xmlParser.parse(xmlData)
             // Extract certificate chain.
             let certificates = try certificateExtractor.extract(from: parsedResponse)
             
@@ -147,13 +147,13 @@ struct DefaultNemIDResponseHandler: NemIDResponseHandler {
     
     /// Verifies the signed element in the xml response
     private func validateXMLSignature(_ response: ParsedXMLDSigResponse, wasSignedBy certificate: X509Certificate) throws {
-        guard let signedInfoC14N = response.signedInfo.data(using: .utf8)?.C14N() else {
+        guard let signedInfoC14N = response.signedInfo.C14N() else {
             throw NemIDResponseHandlerError.failedToExtractSignedInfo
         }
         guard let referenceDigestBase64Decoded = Data(base64Encoded: response.referenceDigestValue) else {
             throw NemIDResponseHandlerError.failedToExtractReferenceDigest
         }
-        guard let objectToBeSignedC14N = response.objectToBeSigned.data(using: .utf8)?.C14N() else {
+        guard let objectToBeSignedC14N = response.objectToBeSigned.C14N() else {
             throw NemIDResponseHandlerError.failedToExtractObjectToBeSigned
         }
         guard let signatureValueBase64Decoded = Data(base64Encoded: response.signatureValue) else {

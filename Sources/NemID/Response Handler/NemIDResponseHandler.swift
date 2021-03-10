@@ -12,7 +12,13 @@ protocol NemIDResponseHandler {
     /// - Check that the certficate has not been revoked
     ///
     /// - Parameters:
-    ///     - response: The XML as a `String` received from the client.
+    ///     - response: The XML as XML data received from the client.
     /// - Returns: A `EventLoopFuture` containg the verified certificate user as `NemIDUser`.
-    func verifyAndExtractUser(from response: String) -> EventLoopFuture<NemIDUser>
+    func verifyAndExtractUser(fromXML xmlData: [UInt8]) -> EventLoopFuture<NemIDUser>
+}
+
+extension NemIDResponseHandler {
+    func verifyAndExtractUser(fromXML xmlString: String) -> EventLoopFuture<NemIDUser> {
+        verifyAndExtractUser(fromXML: [UInt8].init(xmlString.utf8))
+    }
 }

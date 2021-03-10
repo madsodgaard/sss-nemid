@@ -11,6 +11,7 @@ extension DataProtocol {
             let buf = bytes.bindMemory(to: Int8.self)
             return xmlReadMemory(buf.baseAddress, numericCast(buf.count), "noname.xml", nil, 0)
         }) else { return nil }
+        defer { xmlFreeDoc(xmlDoc) }
         
         var outBytes: UnsafeMutablePointer<UInt8>?
         let outLen = xmlC14NDocDumpMemory(xmlDoc, nil, numericCast(XML_C14N_1_1.rawValue), nil, 0, &outBytes)

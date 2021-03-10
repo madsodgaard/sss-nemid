@@ -1,18 +1,19 @@
 import Foundation
 import XCTest
+import Clibxml2
 @testable import NemID
 
-final class SwiftyXMLDSigParserTests: XCTestCase {
-    let sut = SwiftyXMLDSigParser()
+final class libxml2XMLDigParserTests: XCTestCase {
+    let sut = libxml2XMLDSigParser()
     
     func test_parse_signatureValue_returnsSignatureValue() throws {
-        let response = try sut.parse(xml)
-        XCTAssertEqual(response.signatureValue, "signature-value")
+        let result = try sut.parse([UInt8](xml.utf8))
+        XCTAssertEqual(result.signatureValue, "signature-value")
     }
     
     func test_parse_referenceDigestValue_returnsFirstReferenceDigestValue() throws {
-        let response = try sut.parse(xml)
-        XCTAssertEqual(response.referenceDigestValue, "digest-value")
+        let result = try sut.parse([UInt8](xml.utf8))
+        XCTAssertEqual(result.referenceDigestValue, "digest-value")
     }
     
     func test_parse_objectToBeSigned_returnsEntireXMLObject() throws {
@@ -24,13 +25,14 @@ final class SwiftyXMLDSigParserTests: XCTestCase {
     }
     
     func test_parse_x509Certificates_returnsArrayOfCerts() throws {
-        let response = try sut.parse(xml)
-        XCTAssertEqual(response.x509Certificates, ["cert1", "cert2", "cert3"])
+        let result = try sut.parse([UInt8](xml.utf8))
+        XCTAssertEqual(result.x509Certificates, ["cert1", "cert2", "cert3"])
     }
 }
 
 let xml = """
-<ds:Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+<openoces:signature xmlns:openoces="http://www.openoces.org/2006/07/signature">
+<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig">
    <ds:SignedInfo>
       <canonicalizationmethod algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
       <signaturemethod algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
@@ -38,8 +40,8 @@ let xml = """
          <transforms>
             <transform algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315">
          </transform></transforms>
-            <digestmethod algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
-            <ds:DigestValue>digest-value</ds:DigestValue>
+        <digestmethod algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+        <ds:DigestValue>digest-value</ds:DigestValue>
         </ds:Reference>
    </ds:SignedInfo>
    <ds:SignatureValue>signature-value</ds:SignatureValue>
@@ -80,4 +82,5 @@ let xml = """
       </bankidsigneddata>
    </ds:Object>
 </ds:Signature>
+</openoces:signature>
 """

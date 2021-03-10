@@ -1,5 +1,5 @@
 import Foundation
 
 protocol XMLDSigParser {
-    func parse(_ xml: String) throws -> ParsedXMLDSigResponse
+    func parse(_ xml: [UInt8]) throws -> ParsedXMLDSigResponse
 }
