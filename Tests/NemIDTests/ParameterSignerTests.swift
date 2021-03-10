@@ -1,5 +1,5 @@
 import XCTest
-import NemID
+@testable import NemID
 
 final class ParameterSignerTests: XCTestCase {
     func test_sign_returnsSignedParameters() throws {
@@ -11,12 +11,12 @@ final class ParameterSignerTests: XCTestCase {
             origin: URL(string: "https://nemid.dk")!,
             rememberUserID: nil,
             rememberUserIDInitialStatus: nil,
-            SPCert: "cert",
             timestamp: date)
         
         let rsaKey = try RSAKey.private(pem: rsaPrivateKey)
         let rsaSigner = RSASigner(key: rsaKey)
-        let signer = DefaultNemIDParametersSigner(rsaSigner: rsaSigner)
+        let configuration = NemIDConfiguration(spCertificate: "cert")
+        let signer = NemIDParametersSigner(rsaSigner: rsaSigner, configuration: configuration)
         
         let signedParameters = try signer.sign(parameters)
         
