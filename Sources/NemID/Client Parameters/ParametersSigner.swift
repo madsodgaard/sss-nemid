@@ -5,7 +5,11 @@ enum NemIDParameterSigningError: Error {
     case invalidData
 }
 
-public struct NemIDParametersSigner {
+public protocol NemIDParametersSigner {
+    func sign(_ parameters: NemIDUnsignedClientParameters) throws -> NemIDSignedClientParameters
+}
+
+public struct DefaultNemIDParametersSigner: NemIDParametersSigner {
     private let rsaSigner: RSASigner
     
     public init(rsaSigner: RSASigner) {
