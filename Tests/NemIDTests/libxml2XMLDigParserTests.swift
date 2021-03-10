@@ -7,30 +7,65 @@ final class libxml2XMLDigParserTests: XCTestCase {
     let sut = libxml2XMLDSigParser()
     
     func test_parse_signatureValue_returnsSignatureValue() throws {
-        let result = try sut.parse([UInt8](xml.utf8))
+        let result = try sut.parse([UInt8](exampleXMLResponse.utf8))
         XCTAssertEqual(result.signatureValue, "signature-value")
     }
     
     func test_parse_referenceDigestValue_returnsFirstReferenceDigestValue() throws {
-        let result = try sut.parse([UInt8](xml.utf8))
+        let result = try sut.parse([UInt8](exampleXMLResponse.utf8))
         XCTAssertEqual(result.referenceDigestValue, "digest-value")
     }
     
     func test_parse_objectToBeSigned_returnsEntireXMLObject() throws {
-        XCTFail()
+        let result = try sut.parse([UInt8](exampleXMLStructure.utf8))
+        XCTAssertEqual(String(data: result.objectToBeSigned, encoding: .utf8), """
+        <ds:Object Id="ToBeSigned">
+        <element>object</element>
+        </ds:Object>
+        """
+        )
     }
     
     func test_parse_signedInfo_returnsEntireXMLObject() throws {
-        XCTFail()
+        let result = try sut.parse([UInt8](exampleXMLStructure.utf8))
+        XCTAssertEqual(String(data: result.signedInfo, encoding: .utf8), """
+        <ds:SignedInfo>
+        <ds:Reference>
+        <ds:DigestValue>digest-value</ds:DigestValue>
+        </ds:Reference>
+        </ds:SignedInfo>
+        """
+        )
     }
     
     func test_parse_x509Certificates_returnsArrayOfCerts() throws {
-        let result = try sut.parse([UInt8](xml.utf8))
+        let result = try sut.parse([UInt8](exampleXMLResponse.utf8))
         XCTAssertEqual(result.x509Certificates, ["cert1", "cert2", "cert3"])
     }
 }
 
-let xml = """
+fileprivate let exampleXMLStructure = """
+<openoces:signature xmlns:openoces="http://www.openoces.org/2006/07/signature">
+<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig">
+<ds:SignedInfo>
+<ds:Reference>
+<ds:DigestValue>digest-value</ds:DigestValue>
+</ds:Reference>
+</ds:SignedInfo>
+<ds:SignatureValue>signature-value</ds:SignatureValue>
+<ds:KeyInfo id="bidKeyInfo">
+<ds:X509Data>
+<ds:X509Certificate>cert1</ds:X509Certificate>
+</ds:X509Data>
+</ds:KeyInfo>
+<ds:Object Id="ToBeSigned">
+<element>object</element>
+</ds:Object>
+</ds:Signature>
+</openoces:signature>
+"""
+
+fileprivate let exampleXMLResponse = """
 <openoces:signature xmlns:openoces="http://www.openoces.org/2006/07/signature">
 <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig">
    <ds:SignedInfo>
