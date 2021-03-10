@@ -1,5 +1,4 @@
 import Foundation
-import SwiftyXMLParser
 import Crypto
 import NIO
 @_implementationOnly import CNemIDBoringSSL

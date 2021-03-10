@@ -1,5 +1,4 @@
 import Foundation
-import SwiftyXMLParser
 
 struct ParsedXMLDSigResponse {
     /// Returns the <SignatureValue> value as base64 encoded string
