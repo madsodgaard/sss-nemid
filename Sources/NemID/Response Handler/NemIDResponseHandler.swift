@@ -110,8 +110,10 @@ struct NemIDResponseHandler {
         }
         
         // Check OCSP signing key usage
+        #warning("todo")
         
         // Check OCSP extension
+        #warning("todo")
     }
     
     private func validateCertificateChain(_ chain: CertificateChain) throws {

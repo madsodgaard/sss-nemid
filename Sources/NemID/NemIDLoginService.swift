@@ -3,11 +3,11 @@ import NIO
 import Logging
 import AsyncHTTPClient
 
-public protocol NemIDClient {
+public protocol NemIDLoginService {
     func delegating(to eventLoop: EventLoop) -> Self
 }
 
-public struct LiveNemIDClient: NemIDClient {
+public struct LiveNemIDLoginService: NemIDLoginService {
     private let httpClient: HTTPClient
     private let logger: Logger
     private let eventLoop: EventLoop
@@ -32,7 +32,7 @@ public struct LiveNemIDClient: NemIDClient {
         )
     }
     
-    public func delegating(to eventLoop: EventLoop) -> LiveNemIDClient {
-        LiveNemIDClient(eventLoop: eventLoop, httpClient: self.httpClient, logger: self.logger, configuration: self.configuration)
+    public func delegating(to eventLoop: EventLoop) -> LiveNemIDLoginService {
+        LiveNemIDLoginService(eventLoop: eventLoop, httpClient: self.httpClient, logger: self.logger, configuration: self.configuration)
     }
 }
