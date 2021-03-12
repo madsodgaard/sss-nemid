@@ -110,10 +110,14 @@ struct NemIDResponseHandler {
         }
         
         // Check OCSP signing key usage
-        #warning("todo")
+        guard ocspCertificate.hasExtendedKeyUsage(.ocspSigning) else {
+            throw NemIDResponseHandlerError.ocspCertificateDidNotHaveOCSPSigningExtendedKeyUsage
+        }
         
         // Check OCSP extension
-        #warning("todo")
+        guard !ocspCertificate.hasOCSPNoCheckExtension() else {
+            throw NemIDResponseHandlerError.ocspCertificateHasNoCheckExtension
+        }
     }
     
     private func validateCertificateChain(_ chain: CertificateChain) throws {

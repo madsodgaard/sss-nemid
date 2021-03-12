@@ -49,4 +49,18 @@ final class X509CertificateTests: XCTestCase {
         let certificate = try X509Certificate(der: Data(base64Encoded: TestCertificates.googleLeaf, options: .ignoreUnknownCharacters)!)
         XCTAssertEqual(certificate.subjectCommonName, "*.google.com")
     }
+    
+    func test_hasExtendedKeyUsage_ocspSinging_withGoogleCert_returnsFalse() throws {
+        let certificate = try X509Certificate(der: Data(base64Encoded: TestCertificates.googleLeaf, options: .ignoreUnknownCharacters)!)
+        XCTAssertEqual(certificate.hasExtendedKeyUsage(.ocspSigning), false)
+    }
+    
+    func test_hasOCSPNoCheckExtension_withGoogleCert_returnsFalse() throws {
+        let certificate = try X509Certificate(der: Data(base64Encoded: TestCertificates.googleLeaf, options: .ignoreUnknownCharacters)!)
+        XCTAssertEqual(certificate.hasOCSPNoCheckExtension(), false)
+    }
+    
+    func test_hasExtendedKeyUsage_ocspSinging_withOCSPCertificate_returnsTrue() throws {
+        XCTFail("Needs example cert.")
+    }
 }

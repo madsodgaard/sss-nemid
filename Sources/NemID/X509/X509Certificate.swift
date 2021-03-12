@@ -88,10 +88,21 @@ final class X509Certificate: BIOLoadable {
         return Int32(flags) & EXFLAG_CA == EXFLAG_CA
     }
     
+    func hasOCSPNoCheckExtension() -> Bool {
+        // -1 means not found, otherwise returns index of extension.
+        CNemIDBoringSSL_X509_get_ext_by_NID(self.ref, NID_id_pkix_OCSP_noCheck, -1) >= 0
+    }
+    
     /// Check if this certificate has a specific `KeyUsage`
     func hasKeyUsage(_ usage: KeyUsage) -> Bool {
         let keyUsage = CNemIDBoringSSL_X509_get_key_usage(self.ref)
         return Int32(keyUsage) & usage.value == usage.value
+    }
+    
+    /// Check if this certificate has a specific extended key usage.
+    func hasExtendedKeyUsage(_ usage: ExtendedKeyUsage) -> Bool {
+        let extendedKeyUsage = CNemIDBoringSSL_X509_get_extended_key_usage(self.ref)
+        return numericCast(extendedKeyUsage) & usage.value == usage.value
     }
     
     /// Returns a pointer to the public key, which is only valid for the lifetime of the closure
@@ -240,5 +251,18 @@ extension X509Certificate {
         
         static let commonName = NameComponent(NID_commonName)
         static let serialNumber = NameComponent(NID_serialNumber)
+    }
+}
+
+// MARK: ExtendedKeyUsage
+extension X509Certificate {
+    struct ExtendedKeyUsage {
+        let value: Int32
+        
+        init(_ value: Int32) {
+            self.value = value
+        }
+        
+        static let ocspSigning = ExtendedKeyUsage(XKU_OCSP_SIGN)
     }
 }
