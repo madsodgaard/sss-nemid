@@ -126,8 +126,8 @@ struct NemIDResponseHandler {
             throw NemIDResponseHandlerError.leafDidNotHaveDigitalSignatureKeyUsage
         }
         
-        // Verify certificate times.
         for certificate in chain {
+            // Verify dates
             guard let notAfter = certificate.notAfter(),
                   let notBefore = certificate.notBefore()
             else {
@@ -137,8 +137,6 @@ struct NemIDResponseHandler {
                 throw NemIDResponseHandlerError.certificateIsOutsideValidTime
             }
         }
-        
-        #warning("Path len validation???")
         
         // Verify that intermediate and root has cA constraint
         guard chain.root.hasCAFlag() && chain.intermediate.hasCAFlag() else {

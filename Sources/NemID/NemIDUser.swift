@@ -15,7 +15,9 @@ public struct NemIDUser {
     public let name: String?
     
     init(from certificate: X509Certificate) throws {
-        guard let commonName = certificate.subjectCommonName else { throw InitializationError.failedToExtractCommonNameFromCertificate }
+        guard let commonName = certificate.subjectCommonName else {
+            throw InitializationError.failedToExtractCommonNameFromCertificate
+        }
         guard let pid = certificate.subjectSerialNumber?.components(separatedBy: "PID:").last else {
             throw InitializationError.failedToExtractPIDFromCertificate
         }
