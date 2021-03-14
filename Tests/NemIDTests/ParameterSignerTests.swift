@@ -15,7 +15,7 @@ final class ParameterSignerTests: XCTestCase {
         
         let rsaKey = try RSAKey.private(pem: rsaPrivateKey)
         let rsaSigner = RSASigner(key: rsaKey)
-        let configuration = NemIDConfiguration(spCertificate: "cert")
+        let configuration = NemIDConfiguration(spCertificate: "cert", serviceProviderID: "", environment: .preproduction)
         let signer = NemIDParametersSigner(rsaSigner: rsaSigner, configuration: configuration)
         
         let signedParameters = try signer.sign(parameters)
