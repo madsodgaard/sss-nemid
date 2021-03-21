@@ -7,11 +7,11 @@ public struct NemIDEnvironment {
         self.pidCPRMatchEndpoint = pidCPRMatchEndpoint
     }
     
-    static let production = NemIDEnvironment(
+    public static let production = NemIDEnvironment(
         pidCPRMatchEndpoint: "https://pidws.certifikat.dk/pid_serviceprovider_server/pidxml/"
     )
     
-    static let preproduction = NemIDEnvironment(
+    public static let preproduction = NemIDEnvironment(
         pidCPRMatchEndpoint: "https://pidws.pp.certifikat.dk/pid_serviceprovider_server/pidxml/"
     )
 }

@@ -4,7 +4,7 @@ import AsyncHTTPClient
 import XMLCoder
 import Logging
 
-struct HTTPPIDCPRMatchClient: PIDCPRMatchClient {
+struct HTTPNemIDPIDCPRMatchClient: NemIDPIDCPRMatchClient {
     enum HTTPPIDCPRMatchClientError: Error {
         case failedToBuildRequest
     }
