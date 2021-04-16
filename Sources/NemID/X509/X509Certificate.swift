@@ -40,46 +40,14 @@ final class X509Certificate: BIOLoadable {
     
     /// Returns the certificate notBefore as a `Date`
     func notBefore() -> Date? {
-        guard let asn1Time = CNemIDBoringSSL_X509_get0_notBefore(self.ref) else { return nil }
-        
-        var _generalizedTimePtr: UnsafeMutablePointer<ASN1_GENERALIZEDTIME>?
-        CNemIDBoringSSL_ASN1_TIME_to_generalizedtime(asn1Time, &_generalizedTimePtr)
-        guard let generalizedTimePtr = _generalizedTimePtr else { return nil }
-        defer { CNemIDBoringSSL_ASN1_GENERALIZEDTIME_free(generalizedTimePtr) }
-        
-        guard let generalizedTimeString = String(
-                bytesNoCopy: UnsafeMutableRawPointer(mutating: generalizedTimePtr.pointee.data),
-                length: numericCast(generalizedTimePtr.pointee.length),
-                encoding: .ascii,
-                freeWhenDone: false
-        )
-        else {
-            return nil
-        }
-        
-        return GeneralizedTimeFormatter.toDate(generalizedTimeString)
+        guard let notBefore = CNemIDBoringSSL_X509_get0_notBefore(self.ref) else { return nil }
+        return Date(timeIntervalSince1970: TimeInterval(notBefore.timeSinceEpoch))
     }
     
     /// Returns the certificate notAfter as a `Date`
     func notAfter() -> Date? {
-        guard let asn1Time = CNemIDBoringSSL_X509_get0_notAfter(self.ref) else { return nil }
-        
-        var _generalizedTimePtr: UnsafeMutablePointer<ASN1_GENERALIZEDTIME>?
-        CNemIDBoringSSL_ASN1_TIME_to_generalizedtime(asn1Time, &_generalizedTimePtr)
-        guard let generalizedTimePtr = _generalizedTimePtr else { return nil }
-        defer { CNemIDBoringSSL_ASN1_GENERALIZEDTIME_free(generalizedTimePtr) }
-        
-        guard let generalizedTimeString = String(
-            bytesNoCopy: UnsafeMutableRawPointer(mutating: generalizedTimePtr.pointee.data),
-            length: numericCast(generalizedTimePtr.pointee.length),
-            encoding: .ascii,
-            freeWhenDone: false
-        )
-        else {
-            return nil
-        }
-        
-        return GeneralizedTimeFormatter.toDate(generalizedTimeString)
+        guard let notAfter = CNemIDBoringSSL_X509_get0_notAfter(self.ref) else { return nil }
+        return Date(timeIntervalSince1970: TimeInterval(notAfter.timeSinceEpoch))
     }
     
     /// Returns a `Bool` indicating whether this certificate has the "CA" constraint flag set.
