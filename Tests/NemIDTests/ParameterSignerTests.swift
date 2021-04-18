@@ -11,12 +11,14 @@ final class ParameterSignerTests: XCTestCase {
             origin: URL(string: "https://nemid.dk")!,
             rememberUserID: nil,
             rememberUserIDInitialStatus: nil,
-            timestamp: date)
+            timestamp: date,
+            enableAwaitingAppApprovalEvent: true
+        )
         
-        let rsaKey = try RSAKey.private(pem: rsaPrivateKey)
-        let rsaSigner = RSASigner(key: rsaKey)
-        let configuration = NemIDConfiguration(spCertificate: "cert", serviceProviderID: "", environment: .preproduction)
-        let signer = NemIDParametersSigner(rsaSigner: rsaSigner, configuration: configuration)
+        let key = try RSAKey.private(pem: rsaPrivateKey)
+        let certificate = try X509Certificate(der: Data(base64Encoded: TestCertificates.googleLeaf, options: .ignoreUnknownCharacters)!)
+        let configuration = NemIDConfiguration(spCertificate: certificate, privateKey: key, serviceProviderID: "", environment: .preproduction)
+        let signer = NemIDParametersSigner(configuration: configuration)
         
         let signedParameters = try signer.sign(parameters)
         
@@ -25,10 +27,11 @@ final class ParameterSignerTests: XCTestCase {
         XCTAssertEqual(signedParameters.origin?.absoluteString, "https://nemid.dk")
         XCTAssertEqual(signedParameters.rememberUserID, nil)
         XCTAssertEqual(signedParameters.rememberUserIDInitialStatus, nil)
-        XCTAssertEqual(signedParameters.SPCert, "cert")
+        try XCTAssertEqual(signedParameters.spCert, certificate.toBase64EncodedDER())
         XCTAssertEqual(signedParameters.timestamp, date)
-        XCTAssertEqual(signedParameters.paramsDigest, "5xhSpQNbt1pxNVASMrdg1irRp7uWR/JkZ5wT4c4IHd0=")
-        XCTAssertEqual(signedParameters.digestSignature, "hUkuhANqk6oqa5+nHBZBc4/UpV0rj7iYn1d2UyBq4XxfyW6O2Qy+LcGN+ZGNVxDJklHbJjg8VbNyjaQ8kYzximmOAvUmCEL9WCw9eT50Uv+6H+uxSQYpe4NijBA2XKhkFAmYH6w2Mdnk9fdku9hq4geVSqCjqIU+8iK++b94LGw=")
+        XCTAssertEqual(signedParameters.paramsDigest, "DRTNpPkJnkYFEBBQGLqX20eg4/cOYEYZXtd55or/7VI=")
+        XCTAssertEqual(signedParameters.digestSignature, "OXtgZLfEOauywJsjsm26v6W0DF/F3VXSnibgB1oSfk58K79HwldpQ/ryUHGiJKb/OmCovKc1P2Vrz6eCy1oMee0D7i6WLGvuARDfSfVO6TOhX2KqN7w3fUEoIMu1izETBArx//FN32AlqLOh1fcP0sF0ShzzoSYYGmEeTrlhMj4=")
+        XCTAssertEqual(signedParameters.enableAwaitingAppApprovalEvent, true)
     }
 }
 

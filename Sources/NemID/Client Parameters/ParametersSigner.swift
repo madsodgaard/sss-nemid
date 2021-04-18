@@ -6,33 +6,38 @@ enum NemIDParameterSigningError: Error {
 }
 
 struct NemIDParametersSigner {
-    private let rsaSigner: RSASigner
     private let configuration: NemIDConfiguration
     
-    public init(rsaSigner: RSASigner, configuration: NemIDConfiguration) {
-        self.rsaSigner = rsaSigner
+    public init(configuration: NemIDConfiguration) {
         self.configuration = configuration
     }
     
+    /// Follows steps according to NemID documentation 3.2
     public func sign(_ parameters: NemIDUnsignedClientParameters) throws -> NemIDSignedClientParameters {
-        let normalizedData = [UInt8](normalizedParameters(parameters).utf8)
+        // Step 1:
+        let normalizedData = try [UInt8](normalizedParameters(parameters).utf8)
         let digest = SHA256.hash(data: normalizedData)
-        // RSASigner also SHA256 hashes the data.
-        let signature = try rsaSigner.sign(normalizedData)
         
+        // Step 2:
+        let signer = RSASigner(key: configuration.privateKey)
+        let signature = try signer.sign(normalizedData)
+        
+        // Step 3:
         let base64ParamsDigest = Data(digest).base64EncodedString()
         let base64SignedDigest = Data(signature).base64EncodedString()
         
-        return NemIDSignedClientParameters(
+        // Step 4:
+        return try NemIDSignedClientParameters(
             clientFlow: parameters.clientFlow,
             language: parameters.language,
             origin: parameters.origin,
             rememberUserID: parameters.rememberUserID,
             rememberUserIDInitialStatus: parameters.rememberUserIDInitialStatus,
-            SPCert: configuration.spCertificate,
+            spCert: configuration.spCertificate.toBase64EncodedDER(),
             timestamp: parameters.timestamp,
             digestSignature: base64SignedDigest,
-            paramsDigest: base64ParamsDigest
+            paramsDigest: base64ParamsDigest,
+            enableAwaitingAppApprovalEvent: parameters.enableAwaitingAppApprovalEvent
         )
     }
     
@@ -40,12 +45,12 @@ struct NemIDParametersSigner {
     ///
     /// 1. The parameters are sorted alphabetically by name. The sorting is case-insensitive.
     /// 2. Each parameter is concatenated to the result string as an alternating sequence of name and value
-    private func normalizedParameters(_ unsignedParameters: NemIDUnsignedClientParameters) -> String {
-        var parameters: [String: String] = [
+    private func normalizedParameters(_ unsignedParameters: NemIDUnsignedClientParameters) throws -> String {
+        var parameters: [String: String] = try [
             "CLIENTFLOW": unsignedParameters.clientFlow.rawValue,
             "LANGUAGE": unsignedParameters.language.rawValue,
-            "SP_CERT": configuration.spCertificate,
-            "TIMESTAMP": String(unsignedParameters.timestamp.timeIntervalSince1970 * 1000)
+            "SP_CERT": configuration.spCertificate.toBase64EncodedDER(),
+            "TIMESTAMP": String(Int(unsignedParameters.timestamp.timeIntervalSince1970 * 1000))
         ]
         
         if let origin = unsignedParameters.origin?.absoluteString {
@@ -56,6 +61,10 @@ struct NemIDParametersSigner {
         }
         if let rememberUserIDInitialStatus = unsignedParameters.rememberUserIDInitialStatus {
             parameters["REMEMBER_USERID_INITIAL_STATUS"] = rememberUserIDInitialStatus ? "TRUE": "FALSE"
+        }
+        
+        if let enableAwaitingAppApprovalEvent = unsignedParameters.enableAwaitingAppApprovalEvent {
+            parameters["ENABLE_AWAITING_APP_APPROVAL_EVENT"] = enableAwaitingAppApprovalEvent ? "TRUE" : "FALSE"
         }
         
         let sortedAlphabeticallyByKeys = parameters.sorted(by: { $0.key.lowercased() < $1.key.lowercased()} )

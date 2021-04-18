@@ -5,18 +5,32 @@ import Crypto
 enum X509CertificateError: Error {
     case failedToRetrievePublicKey
     case failedToGetSerialNumber
+    case failedToRetrieveDERRepresentation
 }
 
-final class X509Certificate: BIOLoadable {
-    /// Initialize a new certificate from a PEM string
-    convenience init(der string: String) throws {
+public final class X509Certificate: BIOLoadable {
+    /// Initialize a new certificate from a DER string
+    public convenience init(der string: String) throws {
         try self.init(der: [UInt8](string.utf8))
     }
     
     /// Initialize a new certificate from DER-encoded data.
-    convenience init<Data>(der data: Data) throws where Data: DataProtocol {
+    public convenience init<Data>(der data: Data) throws where Data: DataProtocol {
         let x509 = try Self.load(pem: data) { bioPtr in
             return CNemIDBoringSSL_d2i_X509_bio(bioPtr, nil)
+        }
+        self.init(x509)
+    }
+    
+    /// Initialize a new certificate from a PEM string
+    public convenience init(pem string: String) throws {
+        try self.init(pem: [UInt8](string.utf8))
+    }
+    
+    /// Initialize a new certificate from DER-encoded data.
+    public convenience init<Data>(pem data: Data) throws where Data: DataProtocol {
+        let x509 = try Self.load(pem: data) { bioPtr in
+            return CNemIDBoringSSL_PEM_read_bio_X509(bioPtr, nil, nil, nil)
         }
         self.init(x509)
     }
@@ -173,6 +187,34 @@ final class X509Certificate: BIOLoadable {
         _ref.assumingMemoryBound(to: X509.self)
     }
     
+    func toDERBytes() throws -> [UInt8] {
+        return try self.withUnsafeDERCertificateBuffer { Array($0) }
+    }
+    
+    func toBase64EncodedDER() throws -> String {
+        try Data(self.toDERBytes()).base64EncodedString()
+    }
+    
+    private func withUnsafeDERCertificateBuffer<T>(_ body: (UnsafeRawBufferPointer) throws -> T) throws -> T {
+        guard let bio = CNemIDBoringSSL_BIO_new(CNemIDBoringSSL_BIO_s_mem()) else {
+            fatalError("Failed to malloc for a BIO handler")
+        }
+        defer { CNemIDBoringSSL_BIO_free(bio) }
+        
+        guard CNemIDBoringSSL_i2d_X509_bio(bio, self.ref) == 1 else {
+            throw X509CertificateError.failedToRetrieveDERRepresentation
+        }
+        
+        var dataPtr: UnsafeMutablePointer<CChar>? = nil
+        let length = CNemIDBoringSSL_BIO_get_mem_data(bio, &dataPtr)
+        
+        guard let bytes = dataPtr.map({ UnsafeRawBufferPointer(start: $0, count: length) }) else {
+            fatalError("Failed to map bytes from a certificate")
+        }
+        
+        return try body(bytes)
+    }
+    
     private let _ref: UnsafeMutableRawPointer
     
     private init(_ ref: UnsafeMutablePointer<X509>) {
@@ -186,7 +228,7 @@ final class X509Certificate: BIOLoadable {
 
 // MARK: Equatable
 extension X509Certificate: Equatable {
-    static func ==(_ lhs: X509Certificate, _ rhs: X509Certificate) -> Bool {
+    public static func ==(_ lhs: X509Certificate, _ rhs: X509Certificate) -> Bool {
         CNemIDBoringSSL_X509_cmp(lhs.ref, rhs.ref) == 0
     }
 }

@@ -10,7 +10,7 @@ public protocol NemIDLoginService {
     /// Validates a XMLDSig message from client, according to the NemID documentation, and returns the certificate user.
     /// - Parameters:
     ///     - response: The XMLDSig xml-document as UTF-8 encoded bytes
-    func validateAndExtractUser(fromResponse response: [UInt8]) -> EventLoopFuture<NemIDUser>
+    func validateAndExtractUser(fromResponse response: Data) -> EventLoopFuture<NemIDUser>
     
     func delegating(to eventLoop: EventLoop) -> Self
     func logging(to logger: Logger) -> Self
@@ -29,7 +29,7 @@ public struct LiveNemIDLoginService: NemIDLoginService {
         self.configuration = configuration
     }
     
-    public func validateAndExtractUser(fromResponse response: [UInt8]) -> EventLoopFuture<NemIDUser> {
+    public func validateAndExtractUser(fromResponse response: Data) -> EventLoopFuture<NemIDUser> {
         let responseHandler = NemIDResponseHandler(
             xmlParser: libxml2XMLDSigParser(),
             certificateExtractor: DefaultCertificateExtractor(),
@@ -37,16 +37,12 @@ public struct LiveNemIDLoginService: NemIDLoginService {
             eventLoop: self.eventLoop
         )
         
-        return responseHandler.verifyAndExtractUser(fromXML: response)
+        return responseHandler.verifyAndExtractUser(from: response)
     }
     
     public func signParameters(_ parameters: NemIDUnsignedClientParameters) -> EventLoopFuture<NemIDSignedClientParameters> {
         do {
-            let parametersSigner = NemIDParametersSigner(
-                rsaSigner: RSASigner(key: try! .private(pem: "")),
-                configuration: self.configuration
-            )
-            
+            let parametersSigner = NemIDParametersSigner(configuration: self.configuration)
             return eventLoop.makeSucceededFuture(try parametersSigner.sign(parameters))
         } catch {
             return eventLoop.makeFailedFuture(error)

@@ -27,10 +27,10 @@ struct libxml2XMLDSigParser: XMLDSigParser {
         }
         defer { xmlXPathFreeContext(context) }
         
-        guard xmlXPathRegisterNs(context, "openoces", "http://www.openoces.org/2006/07/signature") == 0 else {
+        guard xmlXPathRegisterNs(context, "openoces", "http://www.openoces.org/2006/07/signature#") == 0 else {
             throw ParserError.failedToRegisterNamespace
         }
-        guard xmlXPathRegisterNs(context, "ds", "http://www.w3.org/2000/09/xmldsig") == 0 else {
+        guard xmlXPathRegisterNs(context, "ds", "http://www.w3.org/2000/09/xmldsig#") == 0 else {
             throw ParserError.failedToRegisterNamespace
         }
         
@@ -103,7 +103,7 @@ struct libxml2XMLDSigParser: XMLDSigParser {
         defer { xmlBufferFree(xmlBuffer) }
         guard let xmlOutputBuffer = xmlOutputBufferCreateBuffer(xmlBuffer, nil) else { return nil }
         defer { xmlOutputBufferClose(xmlOutputBuffer) }
-        xmlNodeDumpOutput(xmlOutputBuffer, xmlDoc, nodePtr, 0, 1, nil)
+        xmlNodeDumpOutput(xmlOutputBuffer, xmlDoc, nodePtr, 0, 0, nil)
         guard let dataPtr = xmlOutputBufferGetContent(xmlOutputBuffer) else { return nil }
         let length = xmlOutputBufferGetSize(xmlOutputBuffer)
         guard length > 0 else { return nil }

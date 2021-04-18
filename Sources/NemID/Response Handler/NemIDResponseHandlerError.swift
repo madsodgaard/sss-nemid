@@ -1,6 +1,7 @@
 import Foundation
 
 enum NemIDResponseHandlerError: Error {
+    case failedToDecodeResponseAsBase64
     case failedToExtractSignedInfo
     case failedToExtractReferenceDigest
     case failedToExtractObjectToBeSigned

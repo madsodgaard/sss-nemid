@@ -7,6 +7,7 @@ public struct NemIDUnsignedClientParameters: NemIDClientParameters {
     public let rememberUserID: String?
     public let rememberUserIDInitialStatus: Bool?
     public let timestamp: Date
+    public let enableAwaitingAppApprovalEvent: Bool?
     
     public init(
         clientFlow: NemIDClientParametersClientFlow,
@@ -14,7 +15,8 @@ public struct NemIDUnsignedClientParameters: NemIDClientParameters {
         origin: URL?,
         rememberUserID: String?,
         rememberUserIDInitialStatus: Bool?,
-        timestamp: Date
+        timestamp: Date,
+        enableAwaitingAppApprovalEvent: Bool?
     ) {
         self.clientFlow = clientFlow
         self.language = language
@@ -22,5 +24,6 @@ public struct NemIDUnsignedClientParameters: NemIDClientParameters {
         self.rememberUserID = rememberUserID
         self.rememberUserIDInitialStatus = rememberUserIDInitialStatus
         self.timestamp = timestamp
+        self.enableAwaitingAppApprovalEvent = enableAwaitingAppApprovalEvent
     }
 }
