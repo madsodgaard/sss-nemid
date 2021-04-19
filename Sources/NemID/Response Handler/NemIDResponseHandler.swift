@@ -84,11 +84,11 @@ struct NemIDResponseHandler {
         guard let ocspCertificate = basicResponse.certs.first else {
             throw NemIDResponseHandlerError.ocspCertificateNotFoundInResponse
         }
-        #warning("this fails")
-        let signer = RSASigner(key: try ocspCertificate.publicKey(), algorithm: basicResponse.signatureAlgorithm == .sha1 ? .sha1 : .sha256)
-//        guard try signer.verify(basicResponse.signature, signs: basicResponse.tbsResponseData.derBytes) else {
-//            throw NemIDResponseHandlerError.ocspSignatureWasNotSignedByCertificate
-//        }
+        #warning("signature is fixed now, now we need the derBytes fixed.")
+        let signer = RSASigner(key: try ocspCertificate.publicKey(), hashAlgorithm: basicResponse.signatureAlgorithm.hashAlgorithm)
+        guard try signer.verify(basicResponse.signature, signs: basicResponse.tbsResponseData.derBytes) else {
+            throw NemIDResponseHandlerError.ocspSignatureWasNotSignedByCertificate
+        }
         
         // Validate that accompanying certificate was signed by issuer.
         guard try ocspCertificate.isSignedBy(by: chain.intermediate) else {
@@ -177,7 +177,7 @@ struct NemIDResponseHandler {
     }
     
     /// Verifies the signed element in the xml response
-    private func validateXMLSignature(_ response: ParsedXMLDSigResponse, wasSignedBy certificate: X509Certificate) throws {
+    private func validateXMLSignature(_ response: ParsedXMLDSigResponse, wasSignedBy certificate: NemIDX509Certificate) throws {
         guard let signedInfoC14N = response.signedInfo.C14N() else {
             throw NemIDResponseHandlerError.failedToExtractSignedInfo
         }

@@ -21,7 +21,7 @@ struct OCSPRequest {
     ///     - certificate: The `X509Certificate` the requset is for
     ///     - issuer: The `X509Certificate` issuer of `certificate`
     /// - Returns: The OCSP request bytes DER-encoded.
-    init(certificate: X509Certificate, issuer: X509Certificate) throws {
+    init(certificate: NemIDX509Certificate, issuer: NemIDX509Certificate) throws {
         // Hash issuer name and public key
         guard let issuerSubjectSHA256 = issuer.hashedSubject else {
             throw OCSPRequestError.failedToGetIssuerSubject

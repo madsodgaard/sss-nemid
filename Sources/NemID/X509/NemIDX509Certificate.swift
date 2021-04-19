@@ -8,7 +8,7 @@ enum X509CertificateError: Error {
     case failedToRetrieveDERRepresentation
 }
 
-public final class X509Certificate: BIOLoadable {
+public final class NemIDX509Certificate: BIOLoadable {
     /// Initialize a new certificate from a DER string
     public convenience init(der string: String) throws {
         try self.init(der: [UInt8](string.utf8))
@@ -36,17 +36,17 @@ public final class X509Certificate: BIOLoadable {
     }
     
     /// Extracts the public key as `RSAKey`
-    func publicKey() throws -> RSAKey {
+    func publicKey() throws -> NemIDRSAKey {
         try withPublicKey { key in
             guard let rsaKey = CNemIDBoringSSL_EVP_PKEY_get1_RSA(key) else {
                 throw X509CertificateError.failedToRetrievePublicKey
             }
-            return RSAKey(rsaKey)
+            return NemIDRSAKey(rsaKey)
         }
     }
     
     /// Verifies that `self` was signed with `signer`'s private key.
-    func isSignedBy(by signer: X509Certificate) throws -> Bool {
+    func isSignedBy(by signer: NemIDX509Certificate) throws -> Bool {
         try signer.withPublicKey { pubKey in
             CNemIDBoringSSL_X509_verify(self.ref, pubKey) == 1
         }
@@ -227,14 +227,14 @@ public final class X509Certificate: BIOLoadable {
 }
 
 // MARK: Equatable
-extension X509Certificate: Equatable {
-    public static func ==(_ lhs: X509Certificate, _ rhs: X509Certificate) -> Bool {
+extension NemIDX509Certificate: Equatable {
+    public static func ==(_ lhs: NemIDX509Certificate, _ rhs: NemIDX509Certificate) -> Bool {
         CNemIDBoringSSL_X509_cmp(lhs.ref, rhs.ref) == 0
     }
 }
 
 // MARK: - KeyUsage
-extension X509Certificate {
+extension NemIDX509Certificate {
     enum KeyUsage {
         case digitalSignature
         case keyCertSign
@@ -251,7 +251,7 @@ extension X509Certificate {
 }
 
 // MARK: - NameComponent
-extension X509Certificate {
+extension NemIDX509Certificate {
     struct NameComponent {
         let value: Int32
         
@@ -265,7 +265,7 @@ extension X509Certificate {
 }
 
 // MARK: ExtendedKeyUsage
-extension X509Certificate {
+extension NemIDX509Certificate {
     struct ExtendedKeyUsage {
         let value: Int32
         

@@ -1,12 +1,12 @@
 import Foundation
 @_implementationOnly import CNemIDBoringSSL
 
-public final class RSAKey: BIOLoadable {
-    public static func `private`(pem string: String) throws -> RSAKey {
+public final class NemIDRSAKey: BIOLoadable {
+    public static func `private`(pem string: String) throws -> NemIDRSAKey {
         try .private(pem: [UInt8](string.utf8))
     }
     
-    public static func `private`<Data>(pem data: Data) throws -> RSAKey
+    public static func `private`<Data>(pem data: Data) throws -> NemIDRSAKey
         where Data: DataProtocol
     {
         let privateKey = try self.load(pem: data, { bio -> UnsafeMutablePointer<RSA> in

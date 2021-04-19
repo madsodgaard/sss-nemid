@@ -8,25 +8,13 @@ enum RSASignerError: Error {
     case failedToGetDigest
 }
 
-public struct RSASigner {
-    public enum Algorithm {
-        case sha1
-        case sha256
-        
-        var _boringPointer: OpaquePointer {
-            switch self {
-            case .sha1: return CNemIDBoringSSL_EVP_sha1()
-            case .sha256: return CNemIDBoringSSL_EVP_sha256()
-            }
-        }
-    }
+struct RSASigner {
+    let key: NemIDRSAKey
+    let hashAlgorithm: HashAlgorithm
     
-    let key: RSAKey
-    let algorithm: Algorithm
-    
-    public init(key: RSAKey, algorithm: Algorithm = .sha256) {
+    init(key: NemIDRSAKey, hashAlgorithm: HashAlgorithm = .sha256) {
         self.key = key
-        self.algorithm = algorithm
+        self.hashAlgorithm = hashAlgorithm
     }
     
     func sign(_ plaintext: [UInt8]) throws -> [UInt8] {
@@ -35,7 +23,7 @@ public struct RSASigner {
         
         let digest = try self.digest(plaintext)
         guard CNemIDBoringSSL_RSA_sign(
-            CNemIDBoringSSL_EVP_MD_type(algorithm._boringPointer),
+            CNemIDBoringSSL_EVP_MD_type(hashAlgorithm._boringPointer),
             digest,
             numericCast(digest.count),
             &signature,
@@ -51,7 +39,7 @@ public struct RSASigner {
     func verify(_ signature: [UInt8], signs plaintext: [UInt8]) throws -> Bool {
         let digest = try self.digest(plaintext)
         return CNemIDBoringSSL_RSA_verify(
-            CNemIDBoringSSL_EVP_MD_type(algorithm._boringPointer),
+            CNemIDBoringSSL_EVP_MD_type(hashAlgorithm._boringPointer),
             digest,
             numericCast(digest.count),
             signature,
@@ -64,7 +52,7 @@ public struct RSASigner {
         let context = CNemIDBoringSSL_EVP_MD_CTX_new()
         defer { CNemIDBoringSSL_EVP_MD_CTX_free(context) }
         
-        guard CNemIDBoringSSL_EVP_DigestInit_ex(context, algorithm._boringPointer, nil) == 1 else {
+        guard CNemIDBoringSSL_EVP_DigestInit_ex(context, hashAlgorithm._boringPointer, nil) == 1 else {
             throw RSASignerError.failedToInitializeDigest
         }
         

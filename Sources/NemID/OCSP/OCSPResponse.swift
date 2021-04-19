@@ -119,7 +119,7 @@ extension OCSPResponse {
         let signatureAlgorithm: SignatureAlgorithm
         /// The signature as DER encoded bytes.
         let signature: [UInt8]
-        let certs: [X509Certificate]
+        let certs: [NemIDX509Certificate]
         
         init(cbs: UnsafeMutablePointer<CBS>) throws {
             // Parse tbsResponseData (ResponseData)
@@ -156,7 +156,7 @@ extension OCSPResponse {
             defer { CNemIDBoringSSL_OPENSSL_free(signatureBytesPtr) }
             
             // Parse certs ([0] EXPLICIT SEQUENCE OF Certificate OPTIONAL)
-            var _certs = [X509Certificate]()
+            var _certs = [NemIDX509Certificate]()
             var certsCBS = CBS()
             var isCertsPresent: Int32 = 0
             guard CNemIDBoringSSL_CBS_get_optional_asn1(
@@ -185,29 +185,16 @@ extension OCSPResponse {
                     throw OCSPResponseError.failedToParseResponse
                 }
                 defer { CNemIDBoringSSL_OPENSSL_free(certOutPtr) }
-                try _certs.append(X509Certificate(der: [UInt8](UnsafeBufferPointer(start: certOutPtr, count: certOutLength))))
+                try _certs.append(NemIDX509Certificate(der: [UInt8](UnsafeBufferPointer(start: certOutPtr, count: certOutLength))))
             }
             
             self.tbsResponseData = try ResponseData(cbs: &tbsResponseDataCBS)
             self.signatureAlgorithm = algorithm
-            self.signature = [UInt8](UnsafeBufferPointer(start: signatureBytesPtr, count: signatureLength))
+            var signature = [UInt8](UnsafeBufferPointer(start: signatureBytesPtr, count: signatureLength))
+            // Skip first byte (unused number of bits in a BIT_STRING)
+            signature.removeFirst()
+            self.signature = signature
             self.certs = _certs
-        }
-    }
-}
-
-// MARK: SignatureAlgorithm
-extension OCSPResponse.BasicOCSPResponse {
-    enum SignatureAlgorithm {
-        case sha256
-        case sha1
-        
-        init?(nid: Int32) {
-            switch nid {
-            case NID_sha256WithRSAEncryption: self = .sha256
-            case NID_sha1WithRSAEncryption: self = .sha1
-            default: return nil
-            }
         }
     }
 }
@@ -408,22 +395,6 @@ extension OCSPResponse.BasicOCSPResponse.ResponseData.SingleResponse {
             self.issuerNameHash = [UInt8](UnsafeMutableBufferPointer(start: issuerNameHashPtr, count: issuerNameHashLength))
             self.issuerKeyHash = [UInt8](UnsafeMutableBufferPointer(start: issuerKeyHashPtr, count: issuerKeyHashLength))
             self.serialNumber = [UInt8](UnsafeMutableBufferPointer(start: serialNumberPtr, count: serialNumberLength))
-        }
-    }
-}
-
-// MARK: HashAlgorithm
-extension OCSPResponse.BasicOCSPResponse.ResponseData.SingleResponse.CertID {
-    enum HashAlgorithm {
-        case sha256
-        case sha1
-        
-        init?(nid: Int32) {
-            switch nid {
-            case NID_sha256: self = .sha256
-            case NID_sha1: self = .sha1
-            default: return nil
-            }
         }
     }
 }

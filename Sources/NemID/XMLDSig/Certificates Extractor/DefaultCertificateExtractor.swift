@@ -3,11 +3,11 @@ import Foundation
 struct DefaultCertificateExtractor: CertificateExtrator {
     func extract(from xml: ParsedXMLDSigResponse) throws -> CertificateChain {
         let certificates = try xml.x509Certificates
-            .map { base64DerCertificate -> X509Certificate in
+            .map { base64DerCertificate -> NemIDX509Certificate in
                 guard let decoded = Data(base64Encoded: base64DerCertificate, options: .ignoreUnknownCharacters) else {
                     throw CertificateExtractorError.failedToDecodeCertificate
                 }
-                return try X509Certificate(der: decoded)
+                return try NemIDX509Certificate(der: decoded)
             }
         
         guard certificates.count == 3 else { throw CertificateExtractorError.unexpectedCertificateCount(certificates.count) }

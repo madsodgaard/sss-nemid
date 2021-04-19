@@ -10,15 +10,15 @@ final class CertificateExtractorTests: XCTestCase {
             referenceDigestValue: "",
             objectToBeSigned: Data(),
             x509Certificates: [
-                TestCertificates.googleRoot,
-                TestCertificates.googleIntermediate,
-                TestCertificates.googleLeaf,
+                TestHelper.googleRoot,
+                TestHelper.googleIntermediate,
+                TestHelper.googleLeaf,
             ]
         )
         
         let chain = try sut.extract(from: response)
-        try XCTAssertEqual(chain.root, X509Certificate(der: Data(base64Encoded: TestCertificates.googleRoot, options: .ignoreUnknownCharacters)!))
-        try XCTAssertEqual(chain.intermediate, X509Certificate(der: Data(base64Encoded: TestCertificates.googleIntermediate, options: .ignoreUnknownCharacters)!))
-        try XCTAssertEqual(chain.leaf, X509Certificate(der: Data(base64Encoded: TestCertificates.googleLeaf, options: .ignoreUnknownCharacters)!))
+        try XCTAssertEqual(chain.root, NemIDX509Certificate(der: Data(base64Encoded: TestHelper.googleRoot, options: .ignoreUnknownCharacters)!))
+        try XCTAssertEqual(chain.intermediate, NemIDX509Certificate(der: Data(base64Encoded: TestHelper.googleIntermediate, options: .ignoreUnknownCharacters)!))
+        try XCTAssertEqual(chain.leaf, NemIDX509Certificate(der: Data(base64Encoded: TestHelper.googleLeaf, options: .ignoreUnknownCharacters)!))
     }
 }
