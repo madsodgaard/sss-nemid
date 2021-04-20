@@ -26,9 +26,6 @@ struct OCSPRequest {
         guard let issuerSubjectSHA256 = issuer.hashedSubject else {
             throw OCSPRequestError.failedToGetIssuerSubject
         }
-        guard let publicKeySHA256 = issuer.hashedPublicKey else {
-            throw OCSPRequestError.failedToGetIssuerPublicKey
-        }
         
         // Create OCSPRequest ASN1 sequence
         var cbb = CBB()
@@ -79,7 +76,7 @@ struct OCSPRequest {
         }
         
         // Set issuerKeyHash
-        guard CNemIDBoringSSL_CBB_add_asn1_octet_string(&certID, publicKeySHA256, publicKeySHA256.count) == 1 else {
+        guard CNemIDBoringSSL_CBB_add_asn1_octet_string(&certID, issuer.hashedPublicKey, issuer.hashedPublicKey.count) == 1 else {
             throw OCSPRequestError.failedToGenerateRequest
         }
         

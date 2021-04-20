@@ -53,14 +53,14 @@ public final class NemIDX509Certificate: BIOLoadable {
     }
     
     /// Returns the certificate notBefore as a `Date`
-    func notBefore() -> Date? {
-        guard let notBefore = CNemIDBoringSSL_X509_get0_notBefore(self.ref) else { return nil }
+    func notBefore() -> Date {
+        let notBefore = CNemIDBoringSSL_X509_get0_notBefore(self.ref)!
         return Date(timeIntervalSince1970: TimeInterval(notBefore.timeSinceEpoch))
     }
     
     /// Returns the certificate notAfter as a `Date`
-    func notAfter() -> Date? {
-        guard let notAfter = CNemIDBoringSSL_X509_get0_notAfter(self.ref) else { return nil }
+    func notAfter() -> Date {
+        let notAfter = CNemIDBoringSSL_X509_get0_notAfter(self.ref)!
         return Date(timeIntervalSince1970: TimeInterval(notAfter.timeSinceEpoch))
     }
     
@@ -97,13 +97,11 @@ public final class NemIDX509Certificate: BIOLoadable {
     /// Returns the subject as ASN.1/DER encoded bytes.
     var subject: [UInt8]? {
         let _subjectName = CNemIDBoringSSL_X509_get_subject_name(ref)
-        
         var subjectNameBytes: UnsafeMutablePointer<UInt8>?
         let length = CNemIDBoringSSL_i2d_X509_NAME(_subjectName, &subjectNameBytes)
-        
         guard let subjectNamePointer = subjectNameBytes else { return nil }
+        defer { CNemIDBoringSSL_OPENSSL_free(subjectNamePointer) }
         let asn1Bytes = [UInt8](UnsafeBufferPointer(start: subjectNamePointer, count: numericCast(length)))
-        CNemIDBoringSSL_OPENSSL_free(subjectNamePointer)
         return asn1Bytes
     }
     
@@ -115,8 +113,8 @@ public final class NemIDX509Certificate: BIOLoadable {
         let length = CNemIDBoringSSL_i2d_X509_NAME(_name, &nameBytes)
         
         guard let namePointer = nameBytes else { return nil }
+        defer { CNemIDBoringSSL_OPENSSL_free(namePointer) }
         let asn1Bytes = [UInt8](UnsafeBufferPointer(start: namePointer, count: numericCast(length)))
-        CNemIDBoringSSL_OPENSSL_free(namePointer)
         return asn1Bytes
     }
     
@@ -132,25 +130,23 @@ public final class NemIDX509Certificate: BIOLoadable {
     
     /// Allows access to the certificate's serial number as `BIGNUM`
     func withSerialNumber(_ closure: (UnsafeMutablePointer<BIGNUM>) throws -> Void) throws {
-        guard let serialNumberASN1 = CNemIDBoringSSL_X509_get0_serialNumber(self.ref) else {
+        let serialNumberASN1 = CNemIDBoringSSL_X509_get_serialNumber(self.ref)!
+        guard let bn = CNemIDBoringSSL_ASN1_INTEGER_to_BN(serialNumberASN1, nil) else {
             throw X509CertificateError.failedToGetSerialNumber
         }
-        var bn = BIGNUM()
-        CNemIDBoringSSL_BN_init(&bn)
-        CNemIDBoringSSL_ASN1_INTEGER_to_BN(serialNumberASN1, &bn)
-        try closure(&bn)
-        CNemIDBoringSSL_BN_clear(&bn)
+        defer { CNemIDBoringSSL_BN_free(bn) }
+        try closure(bn)
     }
     
     /// Returns the certificate's public key as SHA256 encoded DER bytes.
-    var hashedPublicKey: [UInt8]? {
-        guard let pubKeyASN1 = CNemIDBoringSSL_X509_get0_pubkey_bitstr(self.ref) else {
-            return nil
-        }
-        
+    var hashedPublicKey: [UInt8] {
+        let pubKeyASN1 = CNemIDBoringSSL_X509_get0_pubkey_bitstr(self.ref)!
         // No need to copy data
-        let pubKeyData = Data(bytesNoCopy: CNemIDBoringSSL_ASN1_STRING_data(pubKeyASN1), count: numericCast(CNemIDBoringSSL_ASN1_STRING_length(pubKeyASN1)), deallocator: .none)
-        
+        let pubKeyData = Data(
+            bytesNoCopy: CNemIDBoringSSL_ASN1_STRING_data(pubKeyASN1),
+            count: numericCast(CNemIDBoringSSL_ASN1_STRING_length(pubKeyASN1)),
+            deallocator: .none
+        )
         return [UInt8](SHA256.hash(data: pubKeyData))
     }
     

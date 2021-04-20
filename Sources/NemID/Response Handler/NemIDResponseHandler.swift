@@ -84,11 +84,12 @@ struct NemIDResponseHandler {
         guard let ocspCertificate = basicResponse.certs.first else {
             throw NemIDResponseHandlerError.ocspCertificateNotFoundInResponse
         }
-        #warning("signature is fixed now, now we need the derBytes fixed.")
+        #warning("der bytes has correct length, so I think it's the signer failing?s")
         let signer = RSASigner(key: try ocspCertificate.publicKey(), hashAlgorithm: basicResponse.signatureAlgorithm.hashAlgorithm)
-        guard try signer.verify(basicResponse.signature, signs: basicResponse.tbsResponseData.derBytes) else {
-            throw NemIDResponseHandlerError.ocspSignatureWasNotSignedByCertificate
-        }
+        
+//        guard try signer.verify(basicResponse.signature, signs: basicResponse.tbsResponseData.derBytes) else {
+//            throw NemIDResponseHandlerError.ocspSignatureWasNotSignedByCertificate
+//        }
         
         // Validate that accompanying certificate was signed by issuer.
         guard try ocspCertificate.isSignedBy(by: chain.intermediate) else {
@@ -108,15 +109,16 @@ struct NemIDResponseHandler {
             throw NemIDResponseHandlerError.ocspCertificateWrongHashAlgorithm
         }
         
+        #warning("todo: remove fatalerror")
         // Check hash name, key hash and serial number are the ones we sent in the request.
-        #warning("crashes")
-//        try chain.leaf.withSerialNumber { serialNumber in
-//            var ptr: UnsafeMutablePointer<UInt8>?
-//            ptr = nil
-//            let leafSerialNumberSize = CNemIDBoringSSL_BN_bn2bin(serialNumber, ptr)
-//            let leafSerialNumberBytes = [UInt8](UnsafeMutableBufferPointer(start: ptr, count: leafSerialNumberSize))
-//            guard certResponse.certID.serialNumber == leafSerialNumberBytes else { fatalError() }
-//        }
+        try chain.leaf.withSerialNumber { serialNumber in
+            var output = [UInt8](repeating: 0, count: numericCast(CNemIDBoringSSL_BN_num_bytes(serialNumber)))
+            let leafSerialNumberSize = CNemIDBoringSSL_BN_bn2bin(serialNumber, &output)
+            let leafSerialNumberBytes = [UInt8](output[0..<Int(leafSerialNumberSize)])
+            guard certResponse.certID.serialNumber == leafSerialNumberBytes else {
+                fatalError()
+            }
+        }
         guard chain.intermediate.hashedPublicKey == certResponse.certID.issuerKeyHash else { fatalError() }
         guard chain.intermediate.hashedSubject == certResponse.certID.issuerNameHash else { fatalError() }
         
@@ -144,12 +146,7 @@ struct NemIDResponseHandler {
         
         for certificate in chain {
             // Verify dates
-            guard let notAfter = certificate.notAfter(),
-                  let notBefore = certificate.notBefore()
-            else {
-                throw NemIDResponseHandlerError.failedToExtractCertificateDates
-            }
-            guard Date() < notAfter && Date() > notBefore else {
+            guard Date() < certificate.notAfter() && Date() > certificate.notBefore() else {
                 throw NemIDResponseHandlerError.certificateIsOutsideValidTime
             }
         }
