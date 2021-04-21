@@ -9,9 +9,9 @@ public final class NemIDRSAKey: BIOLoadable {
     public static func `private`<Data>(pem data: Data) throws -> NemIDRSAKey
         where Data: DataProtocol
     {
-        let privateKey = try self.load(pem: data, { bio -> UnsafeMutablePointer<RSA> in
+        guard let privateKey = self.load(pem: data, { bio -> UnsafeMutablePointer<RSA> in
             CNemIDBoringSSL_PEM_read_bio_RSAPrivateKey(bio, nil, nil, nil)
-        })
+        }) else { throw NemIDError.failedToLoadPrivateKey }
         
         return self.init(privateKey)
     }

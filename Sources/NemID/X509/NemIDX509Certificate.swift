@@ -2,12 +2,6 @@ import Foundation
 import Crypto
 @_implementationOnly import CNemIDBoringSSL
 
-enum X509CertificateError: Error {
-    case failedToRetrievePublicKey
-    case failedToGetSerialNumber
-    case failedToRetrieveDERRepresentation
-}
-
 public final class NemIDX509Certificate: BIOLoadable {
     /// Initialize a new certificate from a DER string
     public convenience init(der string: String) throws {
@@ -16,9 +10,10 @@ public final class NemIDX509Certificate: BIOLoadable {
     
     /// Initialize a new certificate from DER-encoded data.
     public convenience init<Data>(der data: Data) throws where Data: DataProtocol {
-        let x509 = try Self.load(pem: data) { bioPtr in
+        guard let x509 = Self.load(pem: data, { bioPtr in
             return CNemIDBoringSSL_d2i_X509_bio(bioPtr, nil)
-        }
+        }) else { throw NemIDError.failedToLoadCertificate }
+        
         self.init(x509)
     }
     
@@ -29,9 +24,10 @@ public final class NemIDX509Certificate: BIOLoadable {
     
     /// Initialize a new certificate from DER-encoded data.
     public convenience init<Data>(pem data: Data) throws where Data: DataProtocol {
-        let x509 = try Self.load(pem: data) { bioPtr in
+        guard let x509 = Self.load(pem: data, { bioPtr in
             return CNemIDBoringSSL_PEM_read_bio_X509(bioPtr, nil, nil, nil)
-        }
+        }) else { throw NemIDError.failedToLoadCertificate }
+        
         self.init(x509)
     }
     
@@ -39,7 +35,7 @@ public final class NemIDX509Certificate: BIOLoadable {
     func publicKey() throws -> NemIDRSAKey {
         try withPublicKey { key in
             guard let rsaKey = CNemIDBoringSSL_EVP_PKEY_get1_RSA(key) else {
-                throw X509CertificateError.failedToRetrievePublicKey
+                throw NemIDX509CertificateError.failedToRetrievePublicKey
             }
             return NemIDRSAKey(rsaKey)
         }
@@ -89,7 +85,7 @@ public final class NemIDX509Certificate: BIOLoadable {
     
     /// Returns a pointer to the public key, which is only valid for the lifetime of the closure
     func withPublicKey<T>(_ handler: (UnsafeMutablePointer<EVP_PKEY>?) throws -> T) throws -> T {
-        guard let pubKey = CNemIDBoringSSL_X509_get_pubkey(self.ref) else { throw X509CertificateError.failedToRetrievePublicKey }
+        guard let pubKey = CNemIDBoringSSL_X509_get_pubkey(self.ref) else { throw NemIDX509CertificateError.failedToRetrievePublicKey }
         defer { CNemIDBoringSSL_EVP_PKEY_free(pubKey) }
         return try handler(pubKey)
     }
@@ -132,7 +128,7 @@ public final class NemIDX509Certificate: BIOLoadable {
     func withSerialNumber(_ closure: (UnsafeMutablePointer<BIGNUM>) throws -> Void) throws {
         let serialNumberASN1 = CNemIDBoringSSL_X509_get_serialNumber(self.ref)!
         guard let bn = CNemIDBoringSSL_ASN1_INTEGER_to_BN(serialNumberASN1, nil) else {
-            throw X509CertificateError.failedToGetSerialNumber
+            throw NemIDX509CertificateError.failedToGetSerialNumber
         }
         defer { CNemIDBoringSSL_BN_free(bn) }
         try closure(bn)
@@ -198,7 +194,7 @@ public final class NemIDX509Certificate: BIOLoadable {
         defer { CNemIDBoringSSL_BIO_free(bio) }
         
         guard CNemIDBoringSSL_i2d_X509_bio(bio, self.ref) == 1 else {
-            throw X509CertificateError.failedToRetrieveDERRepresentation
+            throw NemIDX509CertificateError.failedToRetrieveDERRepresentation
         }
         
         var dataPtr: UnsafeMutablePointer<CChar>? = nil

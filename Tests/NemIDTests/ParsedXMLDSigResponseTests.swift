@@ -1,9 +1,8 @@
 import XCTest
 @testable import NemID
 
-final class CertificateExtractorTests: XCTestCase {
+final class ParsedXMLDSigResponseTests: XCTestCase {
     func test_extract_extractsChain() throws {
-        let sut = DefaultCertificateExtractor()
         let response = ParsedXMLDSigResponse(
             signatureValue: "",
             signedInfo: Data(),
@@ -16,7 +15,7 @@ final class CertificateExtractorTests: XCTestCase {
             ]
         )
         
-        let chain = try sut.extract(from: response)
+        let chain = try response.verifiedCertificateChain()
         try XCTAssertEqual(chain.root, NemIDX509Certificate(der: Data(base64Encoded: TestHelper.googleRoot, options: .ignoreUnknownCharacters)!))
         try XCTAssertEqual(chain.intermediate, NemIDX509Certificate(der: Data(base64Encoded: TestHelper.googleIntermediate, options: .ignoreUnknownCharacters)!))
         try XCTAssertEqual(chain.leaf, NemIDX509Certificate(der: Data(base64Encoded: TestHelper.googleLeaf, options: .ignoreUnknownCharacters)!))

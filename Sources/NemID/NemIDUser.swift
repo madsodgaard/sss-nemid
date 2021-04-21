@@ -1,12 +1,12 @@
 import Foundation
 
+enum NemIDUserError: Error {
+    case failedToExtractCommonName
+    case failedToExtractSerialNumber
+}
+
 /// A model that represents a private NemID user (POCES certificate) with their PID and their name.
 public struct NemIDUser {
-    enum InitializationError: Error {
-        case failedToExtractCommonNameFromCertificate
-        case failedToExtractPIDFromCertificate
-    }
-    
     /// The PID representing this user. This value can be used to verify a given CPR matches with this user.
     public let pid: String
     
@@ -17,12 +17,11 @@ public struct NemIDUser {
     
     init(from certificate: NemIDX509Certificate) throws {
         guard let commonName = certificate.subjectCommonName else {
-            throw InitializationError.failedToExtractCommonNameFromCertificate
+            throw NemIDUserError.failedToExtractCommonName
         }
         guard let pid = certificate.subjectSerialNumber?.components(separatedBy: "PID:").last else {
-            throw InitializationError.failedToExtractPIDFromCertificate
+            throw NemIDUserError.failedToExtractSerialNumber
         }
-        
         self.init(pid: pid, name: commonName != "Pseudonym" ? commonName : nil)
     }
     

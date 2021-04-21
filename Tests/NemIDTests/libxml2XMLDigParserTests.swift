@@ -45,8 +45,8 @@ final class libxml2XMLDigParserTests: XCTestCase {
 }
 
 fileprivate let exampleXMLStructure = """
-<openoces:signature xmlns:openoces="http://www.openoces.org/2006/07/signature">
-<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig">
+<openoces:signature xmlns:openoces="http://www.openoces.org/2006/07/signature#">
+<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
 <ds:SignedInfo>
 <ds:Reference>
 <ds:DigestValue>digest-value</ds:DigestValue>
@@ -66,8 +66,8 @@ fileprivate let exampleXMLStructure = """
 """
 
 fileprivate let exampleXMLResponse = """
-<openoces:signature xmlns:openoces="http://www.openoces.org/2006/07/signature">
-<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig">
+<openoces:signature xmlns:openoces="http://www.openoces.org/2006/07/signature#">
+<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
    <ds:SignedInfo>
       <canonicalizationmethod algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
       <signaturemethod algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>

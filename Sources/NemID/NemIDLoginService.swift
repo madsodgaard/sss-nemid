@@ -32,7 +32,6 @@ public struct LiveNemIDLoginService: NemIDLoginService {
     public func validateAndExtractUser(fromResponse response: Data) -> EventLoopFuture<NemIDUser> {
         let responseHandler = NemIDResponseHandler(
             xmlParser: libxml2XMLDSigParser(),
-            certificateExtractor: DefaultCertificateExtractor(),
             ocspClient: HTTPOCSPClient(client: httpClient, eventLoop: eventLoop, logger: logger),
             eventLoop: self.eventLoop
         )

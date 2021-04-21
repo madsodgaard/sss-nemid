@@ -1,6 +1,6 @@
 import Foundation
 
-enum CertificateExtractorError: Error {
+enum CertificateChainError: Error {
     case failedToDecodeCertificate
     case unexpectedCertificateCount(Int)
     case failedToLocateLeafCertificate
