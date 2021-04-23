@@ -4,18 +4,21 @@ import AsyncHTTPClient
 import XMLCoder
 import Logging
 
-struct HTTPNemIDPIDCPRMatchClient: NemIDPIDCPRMatchClient {
-    enum HTTPPIDCPRMatchClientError: Error {
-        case failedToBuildRequest
-    }
-    
+enum HTTPPIDCPRMatchClientError: Error {
+    case failedToBuildRequest
+    case badStatusCode
+    case invalidResponseBody
+}
+
+public struct HTTPNemIDPIDCPRMatchClient: NemIDPIDCPRMatchClient {
     private let configuration: NemIDConfiguration
     private let eventLoop: EventLoop
     private let xmlEncoder = XMLEncoder()
+    private let xmlDecoder = XMLDecoder()
     private let httpClient: HTTPClient
     private let logger: Logger
     
-    init(
+    public init(
         configuration: NemIDConfiguration,
         eventLoop: EventLoop,
         httpClient: HTTPClient,
@@ -27,16 +30,14 @@ struct HTTPNemIDPIDCPRMatchClient: NemIDPIDCPRMatchClient {
         self.logger = logger
     }
     
-    func verifyPID(_ pid: String, matches cpr: String) -> EventLoopFuture<Void> {
+    public func verifyPID(_ pid: String, matches cpr: String) -> EventLoopFuture<Bool> {
         do {
             let request = PIDCPRMatchRequest(
-                method: .init(
-                    request: .init(
-                        id: UUID().uuidString,
-                        serviceProviderID: configuration.serviceProviderID,
-                        pid: pid,
-                        cpr: cpr
-                    )
+                request: .init(
+                    id: UUID().uuidString,
+                    serviceProviderID: configuration.serviceProviderID,
+                    pid: pid,
+                    cpr: cpr
                 )
             )
             
@@ -44,6 +45,7 @@ struct HTTPNemIDPIDCPRMatchClient: NemIDPIDCPRMatchClient {
             guard let requestString = String(data: requestData, encoding: .utf8) else {
                 throw HTTPPIDCPRMatchClientError.failedToBuildRequest
             }
+            #warning("urlEncoded might not be neccessary according to postman")
             let formEncodedRequest = try "PID_REQUEST=\(requestString)".urlEncoded()
             
             var httpRequest = try HTTPClient.Request(url: configuration.environment.pidCPRMatchEndpoint, method: .POST)
@@ -51,10 +53,52 @@ struct HTTPNemIDPIDCPRMatchClient: NemIDPIDCPRMatchClient {
             httpRequest.body = .string(formEncodedRequest)
             
             #warning("need to add certificate to request")
-            fatalError()
-//            return httpClient.execute(request: httpRequest, eventLoop: .delegate(on: eventLoop), logger: logger)
+            return httpClient.execute(request: httpRequest, eventLoop: .delegate(on: eventLoop), logger: logger)
+                .flatMapThrowing { response -> PIDCPRMatchResponse in
+                    guard (200...299).contains(response.status.code) else {
+                        throw HTTPPIDCPRMatchClientError.badStatusCode
+                    }
+                    guard let body = response.body else {
+                        throw HTTPPIDCPRMatchClientError.invalidResponseBody
+                    }
+                    return try xmlDecoder.decode(PIDCPRMatchResponse.self, from: Data(buffer: body))
+                }
+                .flatMapThrowing { decodedResponse in
+                    switch decodedResponse.response.status.statusCode {
+                    case 0:
+                        return true
+                    case 1:
+                        return false
+                    default:
+                        let reason = decodedResponse.response.status.statusText
+                                .first(where: { $0.language == "UK" })?
+                                .value
+                        throw PIDCPRServiceError(
+                            statusCode: decodedResponse.response.status.statusCode,
+                            reason: reason
+                        )
+                    }
+                }
         } catch {
             return eventLoop.makeFailedFuture(error)
         }
+    }
+    
+    public func delegating(to eventLoop: EventLoop) -> HTTPNemIDPIDCPRMatchClient {
+        HTTPNemIDPIDCPRMatchClient(
+            configuration: self.configuration,
+            eventLoop: eventLoop,
+            httpClient: self.httpClient,
+            logger: self.logger
+        )
+    }
+    
+    public func logging(to logger: Logger) -> HTTPNemIDPIDCPRMatchClient {
+        HTTPNemIDPIDCPRMatchClient(
+            configuration: self.configuration,
+            eventLoop: self.eventLoop,
+            httpClient: self.httpClient,
+            logger: logger
+        )
     }
 }
