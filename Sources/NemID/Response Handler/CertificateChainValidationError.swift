@@ -7,4 +7,5 @@ enum CertificateChainValidationError: Error {
     case issuerDidNotHaveCAFlag
     case leafDidNotHaveDigitalSignatureKeyUsage
     case issuerDidNotHaveKeyCertSignKeyUsage
+    case failedToVerifyRootAsOCES
 }

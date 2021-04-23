@@ -33,7 +33,8 @@ public struct LiveNemIDLoginService: NemIDLoginService {
         let responseHandler = NemIDResponseHandler(
             xmlParser: libxml2XMLDSigParser(),
             ocspClient: HTTPOCSPClient(client: httpClient, eventLoop: eventLoop, logger: logger),
-            eventLoop: self.eventLoop
+            eventLoop: self.eventLoop,
+            configuration: self.configuration
         )
         
         return responseHandler.verifyAndExtractUser(from: response)

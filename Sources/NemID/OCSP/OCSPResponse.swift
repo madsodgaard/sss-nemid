@@ -376,7 +376,6 @@ extension OCSPResponse.BasicOCSPResponse.ResponseData.SingleResponse {
             }
             defer { CNemIDBoringSSL_OPENSSL_free(issuerKeyHashPtr) }
             
-            #warning("check if this works with NemID")
             // Parse serial number
             var serialNumberCBS = CBS()
             guard CNemIDBoringSSL_CBS_get_asn1(cbs, &serialNumberCBS, CBS_ASN1_INTEGER) == 1 else {

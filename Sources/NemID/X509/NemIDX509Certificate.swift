@@ -90,6 +90,11 @@ public final class NemIDX509Certificate: BIOLoadable {
         return try handler(pubKey)
     }
     
+    /// Returns the SHA256 fingerprint of the certificate as a hex string
+    func fingerprint() throws -> String {
+        try SHA256.hash(data: self.toDERBytes()).hex
+    }
+    
     /// Returns the subject as ASN.1/DER encoded bytes.
     var subject: [UInt8]? {
         let _subjectName = CNemIDBoringSSL_X509_get_subject_name(ref)

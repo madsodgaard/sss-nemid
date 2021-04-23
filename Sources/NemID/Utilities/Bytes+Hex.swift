@@ -2,15 +2,15 @@ import Foundation
 
 // https://github.com/vapor/vapor/blob/main/Sources/Vapor/Utilities/Bytes%2BHex.swift
 extension Sequence where Element == UInt8 {
-    public var hex: String {
+    var hex: String {
         self.hexEncodedString()
     }
     
-    public func hexEncodedString(uppercase: Bool = false) -> String {
+    func hexEncodedString(uppercase: Bool = false) -> String {
         return String(decoding: self.hexEncodedBytes(uppercase: uppercase), as: Unicode.UTF8.self)
     }
     
-    public func hexEncodedBytes(uppercase: Bool = false) -> [UInt8] {
+    func hexEncodedBytes(uppercase: Bool = false) -> [UInt8] {
         let table: [UInt8] = uppercase ? radix16table_uppercase : radix16table_lowercase
         var result: [UInt8] = []
         
@@ -23,7 +23,7 @@ extension Sequence where Element == UInt8 {
 }
 
 extension Collection where Element == UInt8 {
-    public func hexEncodedBytes(uppercase: Bool = false) -> [UInt8] {
+    func hexEncodedBytes(uppercase: Bool = false) -> [UInt8] {
         let table: [UInt8] = uppercase ? radix16table_uppercase : radix16table_lowercase
         
         return .init(unsafeUninitializedCapacity: self.count * 2) { buffer, outCount in

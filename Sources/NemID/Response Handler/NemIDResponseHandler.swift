@@ -11,11 +11,13 @@ struct NemIDResponseHandler {
     private let xmlParser: XMLDSigParser
     private let ocspClient: OCSPClient
     private let eventLoop: EventLoop
+    private let configuration: NemIDConfiguration
     
-    init(xmlParser: XMLDSigParser, ocspClient: OCSPClient, eventLoop: EventLoop) {
+    init(xmlParser: XMLDSigParser, ocspClient: OCSPClient, eventLoop: EventLoop, configuration: NemIDConfiguration) {
         self.xmlParser = xmlParser
         self.ocspClient = ocspClient
         self.eventLoop = eventLoop
+        self.configuration = configuration
     }
     
     /// Verifies a response from a NemID client flow such as logging in and extratcs the user as `NemIDUser`
@@ -171,7 +173,9 @@ struct NemIDResponseHandler {
         }
         
         // Verify that root certificate is a trusted OCES certificate.
-        #warning("todo")
+        guard try chain.root.fingerprint() == configuration.environment.ocesCertificateFingerprint else {
+            throw CertificateChainValidationError.failedToVerifyRootAsOCES
+        }
     }
     
     /// Verifies the signed element in the xml response
