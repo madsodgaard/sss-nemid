@@ -123,8 +123,9 @@ extension OCSPResponse {
         
         init(cbs: UnsafeMutablePointer<CBS>) throws {
             // Parse tbsResponseData (ResponseData)
+            // asn1_element: We need the header bytes as well to validate the signature of the response
             var tbsResponseDataCBS = CBS()
-            guard CNemIDBoringSSL_CBS_get_asn1(cbs, &tbsResponseDataCBS, CBS_ASN1_SEQUENCE) == 1 else {
+            guard CNemIDBoringSSL_CBS_get_asn1_element(cbs, &tbsResponseDataCBS, CBS_ASN1_SEQUENCE) == 1 else {
                 throw OCSPResponseError.failedToParseResponse
             }
             
@@ -217,20 +218,26 @@ extension OCSPResponse.BasicOCSPResponse {
             }
             defer { CNemIDBoringSSL_OPENSSL_free(tbsResponseDataPtr) }
             
+            // Since `cbs` contains the header bytes as well, we need to unwrap it into a sequence to continue parsing.
+            var responseDataCBS = CBS()
+            guard CNemIDBoringSSL_CBS_get_asn1(cbs, &responseDataCBS, CBS_ASN1_SEQUENCE) == 1 else {
+                throw OCSPResponseError.failedToParseResponse
+            }
+            
             // Ignore responderID
-            var responderID = CBS()
-            guard CNemIDBoringSSL_CBS_get_any_asn1(cbs, &responderID, nil) == 1 else {
+            var responderCBS = CBS()
+            guard CNemIDBoringSSL_CBS_get_any_asn1(&responseDataCBS, &responderCBS, nil) == 1 else {
                 throw OCSPResponseError.failedToParseResponse
             }
             
             // Ignore producedAt
             var producedAt = CBS()
-            guard CNemIDBoringSSL_CBS_get_asn1(cbs, &producedAt, CBS_ASN1_GENERALIZEDTIME) == 1 else {
+            guard CNemIDBoringSSL_CBS_get_asn1(&responseDataCBS, &producedAt, CBS_ASN1_GENERALIZEDTIME) == 1 else {
                 throw OCSPResponseError.failedToParseResponse
             }
             
             var responsesCBS = CBS()
-            guard CNemIDBoringSSL_CBS_get_asn1(cbs, &responsesCBS, CBS_ASN1_SEQUENCE) == 1 else {
+            guard CNemIDBoringSSL_CBS_get_asn1(&responseDataCBS, &responsesCBS, CBS_ASN1_SEQUENCE) == 1 else {
                 throw OCSPResponseError.failedToParseResponse
             }
             

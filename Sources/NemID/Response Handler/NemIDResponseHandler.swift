@@ -3,10 +3,6 @@ import Crypto
 import NIO
 @_implementationOnly import CNemIDBoringSSL
 
-#warning("if something fails it might be releated to this:")
-/*
- //remember to skip the first byte it is the number of unused bits and it is always 0 for keys and certificates from nodes-php
- */
 struct NemIDResponseHandler {
     private let xmlParser: XMLDSigParser
     private let ocspClient: OCSPClient
@@ -46,7 +42,7 @@ struct NemIDResponseHandler {
                 throw clientError
             }
             
-            // Else parse the response as a successful XML message.
+            // Parse the response as a successful XML message.
             let parsedResponse = try xmlParser.parse([UInt8](base64DecodedData))
             
             // Extract certificate chain.
@@ -84,12 +80,12 @@ struct NemIDResponseHandler {
         guard let ocspCertificate = basicResponse.certs.first else {
             throw OCSPValidationError.certificateNotFoundInResponse
         }
-        #warning("der bytes has correct length, so I think it's the signer failing?s")
-        let signer = RSASigner(key: try ocspCertificate.publicKey(), hashAlgorithm: basicResponse.signatureAlgorithm.hashAlgorithm)
         
-//        guard try signer.verify(basicResponse.signature, signs: basicResponse.tbsResponseData.derBytes) else {
-//            throw OCSPValidationError.signatureWasNotSignedByCertificate
-//        }
+        // Validate OCSP signature was made from tbsResponseData.
+        let signer = RSASigner(key: try ocspCertificate.publicKey(), hashAlgorithm: basicResponse.signatureAlgorithm.hashAlgorithm)
+        guard try signer.verify(basicResponse.signature, signs: basicResponse.tbsResponseData.derBytes) else {
+            throw OCSPValidationError.signatureWasNotSignedByCertificate
+        }
         
         // Validate that accompanying certificate was signed by issuer.
         guard try ocspCertificate.isSignedBy(by: chain.intermediate) else {
