@@ -3,6 +3,7 @@ import NIO
 import AsyncHTTPClient
 import XMLCoder
 import Logging
+import NIOSSL
 
 enum HTTPPIDCPRMatchClientError: Error {
     case failedToBuildRequest
@@ -45,15 +46,22 @@ public struct HTTPNemIDPIDCPRMatchClient: NemIDPIDCPRMatchClient {
             guard let requestString = String(data: requestData, encoding: .utf8) else {
                 throw HTTPPIDCPRMatchClientError.failedToBuildRequest
             }
-            #warning("urlEncoded might not be neccessary according to postman")
             let formEncodedRequest = try "PID_REQUEST=\(requestString)".urlEncoded()
             
             var httpRequest = try HTTPClient.Request(url: configuration.environment.pidCPRMatchEndpoint, method: .POST)
             httpRequest.headers.add(name: "Content-Type", value: "application/x-www-form-urlencoded")
             httpRequest.body = .string(formEncodedRequest)
             
-            #warning("need to add certificate to request")
-            return httpClient.execute(request: httpRequest, eventLoop: .delegate(on: eventLoop), logger: logger)
+            // Configure TLS
+            let certificate = try NIOSSLCertificate(bytes: configuration.spCertificate.toDERBytes(), format: .der)
+            let privateKey = try NIOSSLPrivateKey(bytes: configuration.privateKey.toDERBytes(), format: .der)
+            httpRequest.tlsConfiguration = .forClient(
+                certificateChain: [.certificate(certificate)],
+                privateKey: .privateKey(privateKey)
+            )
+            
+            return httpClient
+                .execute(request: httpRequest, eventLoop: .delegate(on: eventLoop), logger: logger)
                 .flatMapThrowing { response -> PIDCPRMatchResponse in
                     guard (200...299).contains(response.status.code) else {
                         throw HTTPPIDCPRMatchClientError.badStatusCode

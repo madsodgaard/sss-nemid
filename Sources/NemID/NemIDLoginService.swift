@@ -9,7 +9,7 @@ public protocol NemIDLoginService {
     
     /// Validates a XMLDSig message from client, according to the NemID documentation, and returns the certificate user.
     /// - Parameters:
-    ///     - response: The XMLDSig xml-document as UTF-8 encoded bytes
+    ///     - response: The NemID response as base64 encoded `Data`
     func validateAndExtractUser(fromResponse response: Data) -> EventLoopFuture<NemIDUser>
     
     func delegating(to eventLoop: EventLoop) -> Self

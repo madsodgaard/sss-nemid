@@ -16,6 +16,30 @@ public final class NemIDRSAKey: BIOLoadable {
         return self.init(privateKey)
     }
     
+    func toDERBytes() throws -> [UInt8] {
+        return try self.withUnsafeDERCertificateBuffer { Array($0) }
+    }
+    
+    private func withUnsafeDERCertificateBuffer<T>(_ body: (UnsafeRawBufferPointer) throws -> T) throws -> T {
+        guard let bio = CNemIDBoringSSL_BIO_new(CNemIDBoringSSL_BIO_s_mem()) else {
+            fatalError("Failed to malloc for a BIO handler")
+        }
+        defer { CNemIDBoringSSL_BIO_free(bio) }
+        
+        guard CNemIDBoringSSL_i2d_RSAPrivateKey_bio(bio, self.ref) == 1 else {
+            throw NemIDX509CertificateError.failedToRetrieveDERRepresentation
+        }
+        
+        var dataPtr: UnsafeMutablePointer<CChar>? = nil
+        let length = CNemIDBoringSSL_BIO_get_mem_data(bio, &dataPtr)
+        
+        guard let bytes = dataPtr.map({ UnsafeRawBufferPointer(start: $0, count: length) }) else {
+            fatalError("Failed to map bytes from a certificate")
+        }
+        
+        return try body(bytes)
+    }
+    
     var ref: UnsafeMutablePointer<RSA> {
         _ref.assumingMemoryBound(to: RSA.self)
     }
