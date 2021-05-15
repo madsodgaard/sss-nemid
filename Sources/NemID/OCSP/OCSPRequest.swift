@@ -21,13 +21,10 @@ struct OCSPRequest {
     ///     - certificate: The `X509Certificate` the requset is for
     ///     - issuer: The `X509Certificate` issuer of `certificate`
     /// - Returns: The OCSP request bytes DER-encoded.
-    init(certificate: X509Certificate, issuer: X509Certificate) throws {
+    init(certificate: NemIDX509Certificate, issuer: NemIDX509Certificate) throws {
         // Hash issuer name and public key
         guard let issuerSubjectSHA256 = issuer.hashedSubject else {
             throw OCSPRequestError.failedToGetIssuerSubject
-        }
-        guard let publicKeySHA256 = issuer.hashedPublicKey else {
-            throw OCSPRequestError.failedToGetIssuerPublicKey
         }
         
         // Create OCSPRequest ASN1 sequence
@@ -79,7 +76,7 @@ struct OCSPRequest {
         }
         
         // Set issuerKeyHash
-        guard CNemIDBoringSSL_CBB_add_asn1_octet_string(&certID, publicKeySHA256, publicKeySHA256.count) == 1 else {
+        guard CNemIDBoringSSL_CBB_add_asn1_octet_string(&certID, issuer.hashedPublicKey, issuer.hashedPublicKey.count) == 1 else {
             throw OCSPRequestError.failedToGenerateRequest
         }
         

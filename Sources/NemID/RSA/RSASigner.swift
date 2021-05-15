@@ -8,11 +8,13 @@ enum RSASignerError: Error {
     case failedToGetDigest
 }
 
-public struct RSASigner {
-    let key: RSAKey
+struct RSASigner {
+    let key: NemIDRSAKey
+    let hashAlgorithm: HashAlgorithm
     
-    public init(key: RSAKey) {
+    init(key: NemIDRSAKey, hashAlgorithm: HashAlgorithm = .sha256) {
         self.key = key
+        self.hashAlgorithm = hashAlgorithm
     }
     
     func sign(_ plaintext: [UInt8]) throws -> [UInt8] {
@@ -21,7 +23,7 @@ public struct RSASigner {
         
         let digest = try self.digest(plaintext)
         guard CNemIDBoringSSL_RSA_sign(
-            CNemIDBoringSSL_EVP_MD_type(CNemIDBoringSSL_EVP_sha256()),
+            CNemIDBoringSSL_EVP_MD_type(hashAlgorithm._boringPointer),
             digest,
             numericCast(digest.count),
             &signature,
@@ -37,7 +39,7 @@ public struct RSASigner {
     func verify(_ signature: [UInt8], signs plaintext: [UInt8]) throws -> Bool {
         let digest = try self.digest(plaintext)
         return CNemIDBoringSSL_RSA_verify(
-            CNemIDBoringSSL_EVP_MD_type(CNemIDBoringSSL_EVP_sha256()),
+            CNemIDBoringSSL_EVP_MD_type(hashAlgorithm._boringPointer),
             digest,
             numericCast(digest.count),
             signature,
@@ -50,7 +52,7 @@ public struct RSASigner {
         let context = CNemIDBoringSSL_EVP_MD_CTX_new()
         defer { CNemIDBoringSSL_EVP_MD_CTX_free(context) }
         
-        guard CNemIDBoringSSL_EVP_DigestInit_ex(context, CNemIDBoringSSL_EVP_sha256(), nil) == 1 else {
+        guard CNemIDBoringSSL_EVP_DigestInit_ex(context, hashAlgorithm._boringPointer, nil) == 1 else {
             throw RSASignerError.failedToInitializeDigest
         }
         

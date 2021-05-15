@@ -1,37 +1,37 @@
 import Foundation
 import Clibxml2
 
+enum libxml2DSigParserError: Error {
+    case failedToAllocateXMLDoc
+    case failedToCreateXPathContext
+    case failedToRegisterNamespace
+    case failedToParseCertificates
+    case failedToParseSignedElement
+    case failedToParseDigestValue
+    case failedToParseSignatureValue
+    case failedToParseSignedInfo
+}
+
 struct libxml2XMLDSigParser: XMLDSigParser {
-    enum ParserError: Error {
-        case failedToAllocateXMLDoc
-        case failedToCreateXPathContext
-        case failedToRegisterNamespace
-        case failedToParseCertificates
-        case failedToParseSignedElement
-        case failedToParseDigestValue
-        case failedToParseSignatureValue
-        case failedToParseSignedInfo
-    }
-    
     func parse(_ xml: [UInt8]) throws -> ParsedXMLDSigResponse {
         guard let xmlDoc = xml.withUnsafeBytes({ bytes -> xmlDocPtr? in
             let buf = bytes.bindMemory(to: Int8.self)
             return xmlReadMemory(buf.baseAddress, numericCast(buf.count), "noname.xml", nil, 0)
         }) else {
-            throw ParserError.failedToAllocateXMLDoc
+            throw libxml2DSigParserError.failedToAllocateXMLDoc
         }
         defer { xmlFreeDoc(xmlDoc) }
         
         guard let context = xmlXPathNewContext(xmlDoc) else {
-            throw ParserError.failedToCreateXPathContext
+            throw libxml2DSigParserError.failedToCreateXPathContext
         }
         defer { xmlXPathFreeContext(context) }
         
-        guard xmlXPathRegisterNs(context, "openoces", "http://www.openoces.org/2006/07/signature") == 0 else {
-            throw ParserError.failedToRegisterNamespace
-        }
-        guard xmlXPathRegisterNs(context, "ds", "http://www.w3.org/2000/09/xmldsig") == 0 else {
-            throw ParserError.failedToRegisterNamespace
+        guard
+            xmlXPathRegisterNs(context, "openoces", "http://www.openoces.org/2006/07/signature#") == 0,
+            xmlXPathRegisterNs(context, "ds", "http://www.w3.org/2000/09/xmldsig#") == 0
+        else {
+            throw libxml2DSigParserError.failedToRegisterNamespace
         }
         
         // Parse signed element
@@ -40,7 +40,7 @@ struct libxml2XMLDSigParser: XMLDSigParser {
                 context: context,
                 in: xmlDoc
         ) else {
-            throw ParserError.failedToParseSignedElement
+            throw libxml2DSigParserError.failedToParseSignedElement
         }
         
         // Parse singedInfo
@@ -49,7 +49,7 @@ struct libxml2XMLDSigParser: XMLDSigParser {
                 context: context,
                 in: xmlDoc
         ) else {
-            throw ParserError.failedToParseSignedInfo
+            throw libxml2DSigParserError.failedToParseSignedInfo
         }
         
         // Parse digestValue
@@ -57,28 +57,28 @@ struct libxml2XMLDSigParser: XMLDSigParser {
                 query: "/openoces:signature/ds:Signature/ds:SignedInfo/ds:Reference/ds:DigestValue",
                 context: context
         ) else {
-            throw ParserError.failedToParseDigestValue
+            throw libxml2DSigParserError.failedToParseDigestValue
         }
         
         // Parse signatureValue
         guard let signatureValue = parseXPathValue(query: "/openoces:signature/ds:Signature/ds:SignatureValue", context: context) else {
-            throw ParserError.failedToParseSignatureValue
+            throw libxml2DSigParserError.failedToParseSignatureValue
         }
         
         // Parse certificates
         guard let certsXMLObject = xmlXPathEvalExpression("/openoces:signature/ds:Signature/ds:KeyInfo/ds:X509Data/ds:X509Certificate", context) else {
-            throw ParserError.failedToParseCertificates
+            throw libxml2DSigParserError.failedToParseCertificates
         }
         defer { xmlXPathFreeObject(certsXMLObject) }
         guard let nodeSetPtr = certsXMLObject.pointee.nodesetval else {
-            throw ParserError.failedToParseCertificates
+            throw libxml2DSigParserError.failedToParseCertificates
         }
         
         let certificates = try (0..<nodeSetPtr.pointee.nodeNr).map { index -> String in
             guard let nodePtr = nodeSetPtr.pointee.nodeTab[numericCast(index)],
                   let content = xmlNodeGetContent(nodePtr)
             else {
-                throw ParserError.failedToParseCertificates
+                throw libxml2DSigParserError.failedToParseCertificates
             }
             defer { xmlFree(content) }
             return String(cString: content)
@@ -95,7 +95,7 @@ struct libxml2XMLDSigParser: XMLDSigParser {
     
     /// Parses a XPath query and returns the first element as XML data.
     private func parseFirstXPathElementAsXML(query: String, context: xmlXPathContextPtr, in xmlDoc: xmlDocPtr) -> Data? {
-        guard let xPathObject = xmlXPathEvalExpression(#"/openoces:signature/ds:Signature/ds:Object[@Id="ToBeSigned"]"#, context) else {
+        guard let xPathObject = xmlXPathEvalExpression(query, context) else {
             return nil
         }
         guard let nodePtr = xPathObject.pointee.nodesetval?.pointee.nodeTab[0] else { return nil }
@@ -103,7 +103,7 @@ struct libxml2XMLDSigParser: XMLDSigParser {
         defer { xmlBufferFree(xmlBuffer) }
         guard let xmlOutputBuffer = xmlOutputBufferCreateBuffer(xmlBuffer, nil) else { return nil }
         defer { xmlOutputBufferClose(xmlOutputBuffer) }
-        xmlNodeDumpOutput(xmlOutputBuffer, xmlDoc, nodePtr, 0, 1, nil)
+        xmlNodeDumpOutput(xmlOutputBuffer, xmlDoc, nodePtr, 0, 0, nil)
         guard let dataPtr = xmlOutputBufferGetContent(xmlOutputBuffer) else { return nil }
         let length = xmlOutputBufferGetSize(xmlOutputBuffer)
         guard length > 0 else { return nil }

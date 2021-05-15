@@ -1,7 +1,7 @@
 import Foundation
 @testable import NemID
 
-enum TestCertificates {
+enum TestHelper {
     static let googleRoot = """
         MIIDujCCAqKgAwIBAgILBAAAAAABD4Ym5g0wDQYJKoZIhvcNAQEFBQAwTDEgMB4G
         A1UECxMXR2xvYmFsU2lnbiBSb290IENBIC0gUjIxEzARBgNVBAoTCkdsb2JhbFNp
@@ -103,5 +103,23 @@ enum TestCertificates {
         1QvnVB8COV4oEXGUOo5NsmS5Xg9GPqSB55YMUT3qesThh6FWZgwHNOsYkGDX2/qr
         QslRN0DGtMWV0ov9HcRUJ9zktAxMHsAQPZkl1VDLK9fOZiotwcASXZIwPeyHa4kh
         9AIGDv5ZLD2L1fAhrmD+KyK3XqRYlN3C0wu5AASOwK2j/MS3nvTPZVCO
+    """
+    
+    static let rsaPrivateKey = """
+    -----BEGIN RSA PRIVATE KEY-----
+    MIICXAIBAAKBgQDMEcwZYbKAGNYfpnGUB+mOSzU1n0VTX3Z0fdpBXscWyPn41FWK
+    TYXX6CBJ+BLVnLCXPnZF9d0ELfuPSXN7/a3nAmcTiHx9SUUQDlwVpHKmwimNt35j
+    YwbpAjWJ333XTW6yq+wvTNt8eydOHl5awLV/OlJEELfCBZgDqey/q968gwIDAQAB
+    AoGAM4Fmbx2ObPBX0uMylXctxqFKy77oQ3O7tQkytf8S5rhRBzGoaWDJoEXRKHo5
+    XrrOg03bkirM3sowTOjwAeJ0Kn9KiEkeMlAnIVTtVv+CLsxTMd4hP52qyvNbOpK+
+    rohJtn5pvuQ/mKwQOGzzzqsPzRYuOCPrTYmBP5Ac58yTB6ECQQD5aWr17AI9tTum
+    6O6wpaPicPTZFjhenFl7obXuBrALimH9LJ7iZnXQkq+iunvyks6aMHYncohj3py9
+    qEfOpQjTAkEA0XXDoZW0gTV0K0wHOjuClGledGe9Fmy/r9XmJOvnvdNPRbRK2SOO
+    1ebG+5kK4obKeM0QgVpf7I6vcO0qYWIvkQJANwHO+0n//IgaDefVrNP7Xxe2iKJj
+    8EnfWmsB6utCrGjqz6GlsR0T4tpXLjae25MRSeRiSrTx68TPIO0aWTMAzQJABw2/
+    M87V0FAbhGXADI76e8L8olDoBjxNTD+Yy3+CQ1s9XSyQJLXU1pE5/DkQK8a8RMsr
+    FiAUAORhNh1WgwcKcQJBALlOUOsgMzxOAmCGdKQuGCGw+vk7KhAX7GbWSDbAOCpc
+    wHcQvVwfd8D6Vw5XG8cek7PbISE/XRcxUyTGsxblKvA=
+    -----END RSA PRIVATE KEY-----
     """
 }

@@ -15,10 +15,14 @@ jobs:
           - swift:5.3-focal
     container: ${{ matrix.image }}
     steps:
+      - name: Update apt
+        run: apt update -y
+      - name: Install dependencies
+        run: apt install -y libxml2-dev
       - name: Checkout the code
         uses: actions/checkout@v2
       - name: Run tests with Thread sanitizer
-        run: swift test --eanble-test-discovery --sanitize=thread
+        run: swift test --enable-test-discovery --sanitize=thread
   macOS:
     runs-on: macos-latest
     steps:

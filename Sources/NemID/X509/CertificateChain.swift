@@ -1,9 +1,9 @@
 import Foundation
 
 struct CertificateChain {
-    let root: X509Certificate
-    let intermediate: X509Certificate
-    let leaf: X509Certificate
+    let root: NemIDX509Certificate
+    let intermediate: NemIDX509Certificate
+    let leaf: NemIDX509Certificate
 }
 
 // MARK: Sequence
@@ -15,14 +15,14 @@ extension CertificateChain: Sequence {
 
 // MARK: - CertificateChainIterator
 struct CertificateChainIterator: IteratorProtocol {
-    let certificates: [X509Certificate]
+    let certificates: [NemIDX509Certificate]
     private var currentPos = 0
     
-    init(certificates: [X509Certificate]) {
+    init(certificates: [NemIDX509Certificate]) {
         self.certificates = certificates
     }
     
-    mutating func next() -> X509Certificate? {
+    mutating func next() -> NemIDX509Certificate? {
         if currentPos < certificates.count {
             let oldPosition = currentPos
             currentPos += 1
