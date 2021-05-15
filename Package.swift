@@ -16,10 +16,8 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-crypto.git", from: "1.1.3"),
-//        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.0.0"),
+        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.3.0"),
         .package(url: "https://github.com/MaxDesiatov/XMLCoder.git", from: "0.12.0"),
-        .package(url: "https://github.com/apple/swift-nio-ssl.git", .branch("main")),
-        .package(url: "https://github.com/madsodgaard/async-http-client.git", .branch("mo-request-tls")),
     ],
     targets: [
         .target(
