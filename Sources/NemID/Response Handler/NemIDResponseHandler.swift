@@ -1,6 +1,6 @@
 import Foundation
 import Crypto
-import NIO
+import NIOCore
 @_implementationOnly import CNemIDBoringSSL
 
 struct NemIDResponseHandler {

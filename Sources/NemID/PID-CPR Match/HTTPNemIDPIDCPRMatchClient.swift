@@ -1,5 +1,6 @@
 import Foundation
-import NIO
+import NIOCore
+import NIOFoundationCompat
 import AsyncHTTPClient
 import XMLCoder
 import Logging
@@ -55,10 +56,10 @@ public struct HTTPNemIDPIDCPRMatchClient: NemIDPIDCPRMatchClient {
             // Configure TLS
             let certificate = try NIOSSLCertificate(bytes: configuration.spCertificate.toDERBytes(), format: .der)
             let privateKey = try NIOSSLPrivateKey(bytes: configuration.privateKey.toDERBytes(), format: .der)
-            httpRequest.tlsConfiguration = .forClient(
-                certificateChain: [.certificate(certificate)],
-                privateKey: .privateKey(privateKey)
-            )
+            var tlsConfiguration = TLSConfiguration.makeClientConfiguration()
+            tlsConfiguration.certificateChain = [.certificate(certificate)]
+            tlsConfiguration.privateKey = .privateKey(privateKey)
+            httpRequest.tlsConfiguration = tlsConfiguration
             
             return httpClient
                 .execute(request: httpRequest, eventLoop: .delegate(on: eventLoop), logger: logger)

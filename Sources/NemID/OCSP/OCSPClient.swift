@@ -1,5 +1,5 @@
 import Foundation
-import NIO
+import NIOCore
 
 protocol OCSPClient {
     func send(request: OCSPRequest) -> EventLoopFuture<OCSPResponse>
