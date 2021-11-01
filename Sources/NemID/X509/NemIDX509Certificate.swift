@@ -2,84 +2,62 @@ import Foundation
 import Crypto
 @_implementationOnly import CNemIDBoringSSL
 
-enum X509CertificateError: Error {
-    case failedToRetrievePublicKey
-    case failedToGetSerialNumber
-}
-
-final class X509Certificate: BIOLoadable {
-    /// Initialize a new certificate from a PEM string
-    convenience init(der string: String) throws {
+public final class NemIDX509Certificate: BIOLoadable {
+    /// Initialize a new certificate from a DER string
+    public convenience init(der string: String) throws {
         try self.init(der: [UInt8](string.utf8))
     }
     
     /// Initialize a new certificate from DER-encoded data.
-    convenience init<Data>(der data: Data) throws where Data: DataProtocol {
-        let x509 = try Self.load(pem: data) { bioPtr in
+    public convenience init<Data>(der data: Data) throws where Data: DataProtocol {
+        guard let x509 = Self.load(pem: data, { bioPtr in
             return CNemIDBoringSSL_d2i_X509_bio(bioPtr, nil)
-        }
+        }) else { throw NemIDError.failedToLoadCertificate }
+        
+        self.init(x509)
+    }
+    
+    /// Initialize a new certificate from a PEM string
+    public convenience init(pem string: String) throws {
+        try self.init(pem: [UInt8](string.utf8))
+    }
+    
+    /// Initialize a new certificate from DER-encoded data.
+    public convenience init<Data>(pem data: Data) throws where Data: DataProtocol {
+        guard let x509 = Self.load(pem: data, { bioPtr in
+            return CNemIDBoringSSL_PEM_read_bio_X509(bioPtr, nil, nil, nil)
+        }) else { throw NemIDError.failedToLoadCertificate }
+        
         self.init(x509)
     }
     
     /// Extracts the public key as `RSAKey`
-    func publicKey() throws -> RSAKey {
+    func publicKey() throws -> NemIDRSAKey {
         try withPublicKey { key in
             guard let rsaKey = CNemIDBoringSSL_EVP_PKEY_get1_RSA(key) else {
-                throw X509CertificateError.failedToRetrievePublicKey
+                throw NemIDX509CertificateError.failedToRetrievePublicKey
             }
-            return RSAKey(rsaKey)
+            return NemIDRSAKey(rsaKey)
         }
     }
     
     /// Verifies that `self` was signed with `signer`'s private key.
-    func isSignedBy(by signer: X509Certificate) throws -> Bool {
+    func isSignedBy(by signer: NemIDX509Certificate) throws -> Bool {
         try signer.withPublicKey { pubKey in
             CNemIDBoringSSL_X509_verify(self.ref, pubKey) == 1
         }
     }
     
     /// Returns the certificate notBefore as a `Date`
-    func notBefore() -> Date? {
-        guard let asn1Time = CNemIDBoringSSL_X509_get0_notBefore(self.ref) else { return nil }
-        
-        var _generalizedTimePtr: UnsafeMutablePointer<ASN1_GENERALIZEDTIME>?
-        CNemIDBoringSSL_ASN1_TIME_to_generalizedtime(asn1Time, &_generalizedTimePtr)
-        guard let generalizedTimePtr = _generalizedTimePtr else { return nil }
-        defer { CNemIDBoringSSL_ASN1_GENERALIZEDTIME_free(generalizedTimePtr) }
-        
-        guard let generalizedTimeString = String(
-                bytesNoCopy: UnsafeMutableRawPointer(mutating: generalizedTimePtr.pointee.data),
-                length: numericCast(generalizedTimePtr.pointee.length),
-                encoding: .ascii,
-                freeWhenDone: false
-        )
-        else {
-            return nil
-        }
-        
-        return GeneralizedTimeFormatter.toDate(generalizedTimeString)
+    func notBefore() -> Date {
+        let notBefore = CNemIDBoringSSL_X509_get0_notBefore(self.ref)!
+        return Date(timeIntervalSince1970: TimeInterval(notBefore.timeSinceEpoch))
     }
     
     /// Returns the certificate notAfter as a `Date`
-    func notAfter() -> Date? {
-        guard let asn1Time = CNemIDBoringSSL_X509_get0_notAfter(self.ref) else { return nil }
-        
-        var _generalizedTimePtr: UnsafeMutablePointer<ASN1_GENERALIZEDTIME>?
-        CNemIDBoringSSL_ASN1_TIME_to_generalizedtime(asn1Time, &_generalizedTimePtr)
-        guard let generalizedTimePtr = _generalizedTimePtr else { return nil }
-        defer { CNemIDBoringSSL_ASN1_GENERALIZEDTIME_free(generalizedTimePtr) }
-        
-        guard let generalizedTimeString = String(
-            bytesNoCopy: UnsafeMutableRawPointer(mutating: generalizedTimePtr.pointee.data),
-            length: numericCast(generalizedTimePtr.pointee.length),
-            encoding: .ascii,
-            freeWhenDone: false
-        )
-        else {
-            return nil
-        }
-        
-        return GeneralizedTimeFormatter.toDate(generalizedTimeString)
+    func notAfter() -> Date {
+        let notAfter = CNemIDBoringSSL_X509_get0_notAfter(self.ref)!
+        return Date(timeIntervalSince1970: TimeInterval(notAfter.timeSinceEpoch))
     }
     
     /// Returns a `Bool` indicating whether this certificate has the "CA" constraint flag set.
@@ -88,29 +66,43 @@ final class X509Certificate: BIOLoadable {
         return Int32(flags) & EXFLAG_CA == EXFLAG_CA
     }
     
+    func hasOCSPNoCheckExtension() -> Bool {
+        // -1 means not found, otherwise returns index of extension.
+        CNemIDBoringSSL_X509_get_ext_by_NID(self.ref, NID_id_pkix_OCSP_noCheck, -1) >= 0
+    }
+    
     /// Check if this certificate has a specific `KeyUsage`
     func hasKeyUsage(_ usage: KeyUsage) -> Bool {
         let keyUsage = CNemIDBoringSSL_X509_get_key_usage(self.ref)
         return Int32(keyUsage) & usage.value == usage.value
     }
     
+    /// Check if this certificate has a specific extended key usage.
+    func hasExtendedKeyUsage(_ usage: ExtendedKeyUsage) -> Bool {
+        let extendedKeyUsage = CNemIDBoringSSL_X509_get_extended_key_usage(self.ref)
+        return numericCast(extendedKeyUsage) & usage.value == usage.value
+    }
+    
     /// Returns a pointer to the public key, which is only valid for the lifetime of the closure
     func withPublicKey<T>(_ handler: (UnsafeMutablePointer<EVP_PKEY>?) throws -> T) throws -> T {
-        guard let pubKey = CNemIDBoringSSL_X509_get_pubkey(self.ref) else { throw X509CertificateError.failedToRetrievePublicKey }
+        guard let pubKey = CNemIDBoringSSL_X509_get_pubkey(self.ref) else { throw NemIDX509CertificateError.failedToRetrievePublicKey }
         defer { CNemIDBoringSSL_EVP_PKEY_free(pubKey) }
         return try handler(pubKey)
+    }
+    
+    /// Returns the SHA256 fingerprint of the certificate as a hex string
+    func fingerprint() throws -> String {
+        try SHA256.hash(data: self.toDERBytes()).hex
     }
     
     /// Returns the subject as ASN.1/DER encoded bytes.
     var subject: [UInt8]? {
         let _subjectName = CNemIDBoringSSL_X509_get_subject_name(ref)
-        
         var subjectNameBytes: UnsafeMutablePointer<UInt8>?
         let length = CNemIDBoringSSL_i2d_X509_NAME(_subjectName, &subjectNameBytes)
-        
         guard let subjectNamePointer = subjectNameBytes else { return nil }
+        defer { CNemIDBoringSSL_OPENSSL_free(subjectNamePointer) }
         let asn1Bytes = [UInt8](UnsafeBufferPointer(start: subjectNamePointer, count: numericCast(length)))
-        CNemIDBoringSSL_OPENSSL_free(subjectNamePointer)
         return asn1Bytes
     }
     
@@ -122,8 +114,8 @@ final class X509Certificate: BIOLoadable {
         let length = CNemIDBoringSSL_i2d_X509_NAME(_name, &nameBytes)
         
         guard let namePointer = nameBytes else { return nil }
+        defer { CNemIDBoringSSL_OPENSSL_free(namePointer) }
         let asn1Bytes = [UInt8](UnsafeBufferPointer(start: namePointer, count: numericCast(length)))
-        CNemIDBoringSSL_OPENSSL_free(namePointer)
         return asn1Bytes
     }
     
@@ -139,25 +131,23 @@ final class X509Certificate: BIOLoadable {
     
     /// Allows access to the certificate's serial number as `BIGNUM`
     func withSerialNumber(_ closure: (UnsafeMutablePointer<BIGNUM>) throws -> Void) throws {
-        guard let serialNumberASN1 = CNemIDBoringSSL_X509_get0_serialNumber(self.ref) else {
-            throw X509CertificateError.failedToGetSerialNumber
+        let serialNumberASN1 = CNemIDBoringSSL_X509_get_serialNumber(self.ref)!
+        guard let bn = CNemIDBoringSSL_ASN1_INTEGER_to_BN(serialNumberASN1, nil) else {
+            throw NemIDX509CertificateError.failedToGetSerialNumber
         }
-        var bn = BIGNUM()
-        CNemIDBoringSSL_BN_init(&bn)
-        CNemIDBoringSSL_ASN1_INTEGER_to_BN(serialNumberASN1, &bn)
-        try closure(&bn)
-        CNemIDBoringSSL_BN_clear(&bn)
+        defer { CNemIDBoringSSL_BN_free(bn) }
+        try closure(bn)
     }
     
     /// Returns the certificate's public key as SHA256 encoded DER bytes.
-    var hashedPublicKey: [UInt8]? {
-        guard let pubKeyASN1 = CNemIDBoringSSL_X509_get0_pubkey_bitstr(self.ref) else {
-            return nil
-        }
-        
+    var hashedPublicKey: [UInt8] {
+        let pubKeyASN1 = CNemIDBoringSSL_X509_get0_pubkey_bitstr(self.ref)!
         // No need to copy data
-        let pubKeyData = Data(bytesNoCopy: CNemIDBoringSSL_ASN1_STRING_data(pubKeyASN1), count: numericCast(CNemIDBoringSSL_ASN1_STRING_length(pubKeyASN1)), deallocator: .none)
-        
+        let pubKeyData = Data(
+            bytesNoCopy: CNemIDBoringSSL_ASN1_STRING_data(pubKeyASN1),
+            count: numericCast(CNemIDBoringSSL_ASN1_STRING_length(pubKeyASN1)),
+            deallocator: .none
+        )
         return [UInt8](SHA256.hash(data: pubKeyData))
     }
     
@@ -194,6 +184,34 @@ final class X509Certificate: BIOLoadable {
         _ref.assumingMemoryBound(to: X509.self)
     }
     
+    func toDERBytes() throws -> [UInt8] {
+        return try self.withUnsafeDERCertificateBuffer { Array($0) }
+    }
+    
+    func toBase64EncodedDER() throws -> String {
+        try Data(self.toDERBytes()).base64EncodedString()
+    }
+    
+    private func withUnsafeDERCertificateBuffer<T>(_ body: (UnsafeRawBufferPointer) throws -> T) throws -> T {
+        guard let bio = CNemIDBoringSSL_BIO_new(CNemIDBoringSSL_BIO_s_mem()) else {
+            fatalError("Failed to malloc for a BIO handler")
+        }
+        defer { CNemIDBoringSSL_BIO_free(bio) }
+        
+        guard CNemIDBoringSSL_i2d_X509_bio(bio, self.ref) == 1 else {
+            throw NemIDX509CertificateError.failedToRetrieveDERRepresentation
+        }
+        
+        var dataPtr: UnsafeMutablePointer<CChar>? = nil
+        let length = CNemIDBoringSSL_BIO_get_mem_data(bio, &dataPtr)
+        
+        guard let bytes = dataPtr.map({ UnsafeRawBufferPointer(start: $0, count: length) }) else {
+            fatalError("Failed to map bytes from a certificate")
+        }
+        
+        return try body(bytes)
+    }
+    
     private let _ref: UnsafeMutableRawPointer
     
     private init(_ ref: UnsafeMutablePointer<X509>) {
@@ -206,14 +224,14 @@ final class X509Certificate: BIOLoadable {
 }
 
 // MARK: Equatable
-extension X509Certificate: Equatable {
-    static func ==(_ lhs: X509Certificate, _ rhs: X509Certificate) -> Bool {
+extension NemIDX509Certificate: Equatable {
+    public static func ==(_ lhs: NemIDX509Certificate, _ rhs: NemIDX509Certificate) -> Bool {
         CNemIDBoringSSL_X509_cmp(lhs.ref, rhs.ref) == 0
     }
 }
 
 // MARK: - KeyUsage
-extension X509Certificate {
+extension NemIDX509Certificate {
     enum KeyUsage {
         case digitalSignature
         case keyCertSign
@@ -230,7 +248,7 @@ extension X509Certificate {
 }
 
 // MARK: - NameComponent
-extension X509Certificate {
+extension NemIDX509Certificate {
     struct NameComponent {
         let value: Int32
         
@@ -240,5 +258,18 @@ extension X509Certificate {
         
         static let commonName = NameComponent(NID_commonName)
         static let serialNumber = NameComponent(NID_serialNumber)
+    }
+}
+
+// MARK: ExtendedKeyUsage
+extension NemIDX509Certificate {
+    struct ExtendedKeyUsage {
+        let value: Int32
+        
+        init(_ value: Int32) {
+            self.value = value
+        }
+        
+        static let ocspSigning = ExtendedKeyUsage(XKU_OCSP_SIGN)
     }
 }

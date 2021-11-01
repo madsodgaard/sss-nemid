@@ -29,7 +29,7 @@ struct OCSPResponse {
             throw OCSPResponseError.failedToParseResponse
         }
         
-        // Parse response status
+        // Parse responseStatus
         var responseStatusValue: UInt8 = 0
         guard CNemIDBoringSSL_CBS_get_u8(&responseStatusCBS, &responseStatusValue) == 1 else {
             throw OCSPResponseError.failedToParseResponse
@@ -40,7 +40,7 @@ struct OCSPResponse {
         }
         self.responseStatus = responseStatus
         
-        // Parse response bytes
+        // Parse responseBytes ([0] EXPLICIT ResponseBytes OPTIONAL)
         var responseBytesCBS = CBS()
         var isResponseBytesPresent: Int32 = 0
         guard CNemIDBoringSSL_CBS_get_optional_asn1(
@@ -56,21 +56,23 @@ struct OCSPResponse {
             return
         }
         
-        // Parse contents of responseBytes
         var responseBytesChildCBS = CBS()
         guard CNemIDBoringSSL_CBS_get_asn1(&responseBytesCBS, &responseBytesChildCBS, CBS_ASN1_SEQUENCE) == 1 else {
             throw OCSPResponseError.failedToParseResponse
         }
         
-        // Parse responseType
+        // Parse responseType (OBJECT IDENTIFIER)
         var responseTypeCBS = CBS()
         guard CNemIDBoringSSL_CBS_get_asn1(&responseBytesChildCBS, &responseTypeCBS, CBS_ASN1_OBJECT) == 1 else {
             throw OCSPResponseError.failedToParseResponse
         }
-        let responseTypeNID = CNemIDBoringSSL_OBJ_cbs2nid(&responseTypeCBS)
-        guard responseTypeNID == NID_id_pkix_OCSP_basic else { throw OCSPResponseError.responseTypeWasNotOCSPBasic }
         
-        // Parse response
+        let responseTypeNID = CNemIDBoringSSL_OBJ_cbs2nid(&responseTypeCBS)
+        guard responseTypeNID == NID_id_pkix_OCSP_basic else {
+            throw OCSPResponseError.responseTypeWasNotOCSPBasic
+        }
+        
+        // Parse response (OCTET STRING)
         var responseCBS = CBS()
         guard CNemIDBoringSSL_CBS_get_asn1(&responseBytesChildCBS, &responseCBS, CBS_ASN1_OCTETSTRING) == 1 else {
             throw OCSPResponseError.failedToParseResponse
@@ -117,16 +119,17 @@ extension OCSPResponse {
         let signatureAlgorithm: SignatureAlgorithm
         /// The signature as DER encoded bytes.
         let signature: [UInt8]
-        let certs: [X509Certificate]
+        let certs: [NemIDX509Certificate]
         
         init(cbs: UnsafeMutablePointer<CBS>) throws {
-            // Parse tbsResponseData
+            // Parse tbsResponseData (ResponseData)
+            // asn1_element: We need the header bytes as well to validate the signature of the response
             var tbsResponseDataCBS = CBS()
-            guard CNemIDBoringSSL_CBS_get_asn1(cbs, &tbsResponseDataCBS, CBS_ASN1_SEQUENCE) == 1 else {
+            guard CNemIDBoringSSL_CBS_get_asn1_element(cbs, &tbsResponseDataCBS, CBS_ASN1_SEQUENCE) == 1 else {
                 throw OCSPResponseError.failedToParseResponse
             }
             
-            // Parse signature algorithm
+            // Parse signature algorithm (AlgorithmIdentifier)
             var signatureAlgorithmCBS = CBS()
             guard CNemIDBoringSSL_CBS_get_asn1(cbs, &signatureAlgorithmCBS, CBS_ASN1_SEQUENCE) == 1 else {
                 throw OCSPResponseError.failedToParseResponse
@@ -136,7 +139,7 @@ extension OCSPResponse {
                 throw OCSPResponseError.failedToParseResponse
             }
             let algorithmNID = CNemIDBoringSSL_OBJ_cbs2nid(&algorithmCBS)
-            guard let algorithm = BasicOCSPResponse.SignatureAlgorithm(nid: algorithmNID) else {
+            guard let algorithm = SignatureAlgorithm(nid: algorithmNID) else {
                 throw OCSPResponseError.unknownSignatureAlgorithm(algorithmNID)
             }
             
@@ -152,44 +155,47 @@ extension OCSPResponse {
             }
             guard let signatureBytesPtr = signatureBytes else { throw OCSPResponseError.failedToParseResponse }
             defer { CNemIDBoringSSL_OPENSSL_free(signatureBytesPtr) }
-            let signature = [UInt8](UnsafeBufferPointer(start: signatureBytesPtr, count: signatureLength))
             
-            // Parse certs
-            #warning("requires access to nemid to verify...")
+            // Parse certs ([0] EXPLICIT SEQUENCE OF Certificate OPTIONAL)
+            var _certs = [NemIDX509Certificate]()
             var certsCBS = CBS()
             var isCertsPresent: Int32 = 0
             guard CNemIDBoringSSL_CBS_get_optional_asn1(
-                cbs, &certsCBS,
+                cbs,
+                &certsCBS,
                 &isCertsPresent,
-                CBS_ASN1_SEQUENCE | CBS_ASN1_CONTEXT_SPECIFIC | 0
+                CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0
             ) == 1 else {
                 throw OCSPResponseError.failedToParseResponse
             }
             
             if isCertsPresent == 1 {
-                print("certs is present")
+                // We only handle the case of 1 certificate.
+                var certCBS = CBS()
+                guard CNemIDBoringSSL_CBS_get_asn1(&certsCBS, &certCBS, CBS_ASN1_SEQUENCE) == 1 else {
+                    throw OCSPResponseError.failedToParseResponse
+                }
+                
+                // Get DER representation of certificate.
+                var _certOutPtr: UnsafeMutablePointer<UInt8>?
+                var certOutLength = 0
+                guard
+                    CNemIDBoringSSL_CBS_stow(&certCBS, &_certOutPtr, &certOutLength) == 1,
+                    let certOutPtr = _certOutPtr
+                else {
+                    throw OCSPResponseError.failedToParseResponse
+                }
+                defer { CNemIDBoringSSL_OPENSSL_free(certOutPtr) }
+                try _certs.append(NemIDX509Certificate(der: [UInt8](UnsafeBufferPointer(start: certOutPtr, count: certOutLength))))
             }
             
             self.tbsResponseData = try ResponseData(cbs: &tbsResponseDataCBS)
             self.signatureAlgorithm = algorithm
+            var signature = [UInt8](UnsafeBufferPointer(start: signatureBytesPtr, count: signatureLength))
+            // Skip first byte (unused number of bits in a BIT_STRING)
+            signature.removeFirst()
             self.signature = signature
-            self.certs = []
-        }
-    }
-}
-
-// MARK: SignatureAlgorithm
-extension OCSPResponse.BasicOCSPResponse {
-    enum SignatureAlgorithm {
-        case sha256
-        case sha1
-        
-        init?(nid: Int32) {
-            switch nid {
-            case NID_sha256WithRSAEncryption: self = .sha256
-            case NID_sha1WithRSAEncryption: self = .sha1
-            default: return nil
-            }
+            self.certs = _certs
         }
     }
 }
@@ -212,20 +218,26 @@ extension OCSPResponse.BasicOCSPResponse {
             }
             defer { CNemIDBoringSSL_OPENSSL_free(tbsResponseDataPtr) }
             
+            // Since `cbs` contains the header bytes as well, we need to unwrap it into a sequence to continue parsing.
+            var responseDataCBS = CBS()
+            guard CNemIDBoringSSL_CBS_get_asn1(cbs, &responseDataCBS, CBS_ASN1_SEQUENCE) == 1 else {
+                throw OCSPResponseError.failedToParseResponse
+            }
+            
             // Ignore responderID
-            var responderID = CBS()
-            guard CNemIDBoringSSL_CBS_get_any_asn1(cbs, &responderID, nil) == 1 else {
+            var responderCBS = CBS()
+            guard CNemIDBoringSSL_CBS_get_any_asn1(&responseDataCBS, &responderCBS, nil) == 1 else {
                 throw OCSPResponseError.failedToParseResponse
             }
             
             // Ignore producedAt
             var producedAt = CBS()
-            guard CNemIDBoringSSL_CBS_get_asn1(cbs, &producedAt, CBS_ASN1_GENERALIZEDTIME) == 1 else {
+            guard CNemIDBoringSSL_CBS_get_asn1(&responseDataCBS, &producedAt, CBS_ASN1_GENERALIZEDTIME) == 1 else {
                 throw OCSPResponseError.failedToParseResponse
             }
             
             var responsesCBS = CBS()
-            guard CNemIDBoringSSL_CBS_get_asn1(cbs, &responsesCBS, CBS_ASN1_SEQUENCE) == 1 else {
+            guard CNemIDBoringSSL_CBS_get_asn1(&responseDataCBS, &responsesCBS, CBS_ASN1_SEQUENCE) == 1 else {
                 throw OCSPResponseError.failedToParseResponse
             }
             
@@ -371,7 +383,6 @@ extension OCSPResponse.BasicOCSPResponse.ResponseData.SingleResponse {
             }
             defer { CNemIDBoringSSL_OPENSSL_free(issuerKeyHashPtr) }
             
-            #warning("check if this works with NemID")
             // Parse serial number
             var serialNumberCBS = CBS()
             guard CNemIDBoringSSL_CBS_get_asn1(cbs, &serialNumberCBS, CBS_ASN1_INTEGER) == 1 else {
@@ -390,22 +401,6 @@ extension OCSPResponse.BasicOCSPResponse.ResponseData.SingleResponse {
             self.issuerNameHash = [UInt8](UnsafeMutableBufferPointer(start: issuerNameHashPtr, count: issuerNameHashLength))
             self.issuerKeyHash = [UInt8](UnsafeMutableBufferPointer(start: issuerKeyHashPtr, count: issuerKeyHashLength))
             self.serialNumber = [UInt8](UnsafeMutableBufferPointer(start: serialNumberPtr, count: serialNumberLength))
-        }
-    }
-}
-
-// MARK: HashAlgorithm
-extension OCSPResponse.BasicOCSPResponse.ResponseData.SingleResponse.CertID {
-    enum HashAlgorithm {
-        case sha256
-        case sha1
-        
-        init?(nid: Int32) {
-            switch nid {
-            case NID_sha256: self = .sha256
-            case NID_sha1: self = .sha1
-            default: return nil
-            }
         }
     }
 }
